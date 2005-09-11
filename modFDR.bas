@@ -149,8 +149,8 @@ End If
 '0A60    2   Engine 4 running flag
 For x = 0 To (EngineCount - 1)
     Call FSUIPC_Read(&H894 + (&H98 * x), 2, VarPtr(EngineRunning(x)), lngResult)
-    Call FSUIPC_Read(&H2010 + (&H100 * x), 8, VarPtr(EngineN1(x)), lngResult)
-    Call FSUIPC_Read(&H2018 + (&H100 * x), 8, VarPtr(EngineN2(x)), lngResult)
+    Call FSUIPC_Read(&H2000 + (&H100 * x), 8, VarPtr(EngineN1(x)), lngResult)
+    Call FSUIPC_Read(&H2008 + (&H100 * x), 8, VarPtr(EngineN2(x)), lngResult)
     Call FSUIPC_Read(&H88C + (&H98 * x), 2, VarPtr(EngineThrottle(x)), lngResult)
 Next
 
@@ -173,28 +173,28 @@ End If
 frmMain.sbMain.Panels(4).Text = "Sim Time: " & Format(fsTime(0), "00") & ":" & Format(fsTime(1), "00") & " Z"
 
 'Calculate latitude/longitude
-10 data.Latitude = (curLat * 10000#) * 90# / (10001750# * 65536# * 65536#)
-20 data.Longitude = (curLon * 10000#) * 360# / (65536# * 65536# * 65536# * 65536#)
+data.Latitude = (curLat * 10000#) * 90# / (10001750# * 65536# * 65536#)
+data.Longitude = (curLon * 10000#) * 360# / (65536# * 65536# * 65536# * 65536#)
 
 'Calculate speeds
-30 data.AirSpeed = CInt(ASpeed / 128#)
-40 data.GroundSpeed = CInt(GSpeed * 3600# / 65536# / 1852#)
-50 data.VerticalSpeed = CInt(VSpeed * 60# * 3.28084 / 256#)
-60 data.Mach = CDbl(Mach / 20480#)
+data.AirSpeed = CInt(ASpeed / 128#)
+data.GroundSpeed = CInt(GSpeed * 3600# / 65536# / 1852#)
+data.VerticalSpeed = CInt(VSpeed * 60# * 3.28084 / 256#)
+data.Mach = CDbl(Mach / 20480#)
 
 'Calculate heading
-70 magVar = magVar * 360# / 65536#
+magVar = magVar * 360# / 65536#
 data.Heading = CInt(hdg * (360# / (65536# * 65536#)))
 data.Heading = data.Heading - magVar
 If data.Heading < 0 Then data.Heading = (360 + data.Heading)
 
 'Calculate Altitude AGL/MSL
-100 terrElevation = (terrElevation * 3.28084) / 256
-110 data.AltitudeMSL = altMSL * 3.28084
+terrElevation = (terrElevation * 3.28084) / 256
+data.AltitudeMSL = altMSL * 3.28084
 data.AltitudeAGL = data.AltitudeMSL - terrElevation
 
 'Calculate flaps setting
-120 data.Flaps = CInt((flapsL + flapsR) / 512)
+120 data.Flaps = (flapsL / 512) + (flapsR / 512)
 
 'Calculate total fuel remaining in all tanks.
 Dim FuelGallons As Double
@@ -207,12 +207,12 @@ For x = 0 To UBound(TankCapacity)
 Next
 
 'Get fuel/total weight
-130 data.Fuel = FuelGallons * (FuelWeight / 256)
+data.Fuel = FuelGallons * (FuelWeight / 256)
 data.Weight = (ZeroFuelWeight / 256) + data.Fuel
 
 'Count how many engines are running and calculate average N1/N2
 isTurboProp = (EngineType = 5)
-140 data.EngineCount = EngineCount
+data.EngineCount = EngineCount
 Dim EnginesRunning As Integer
 For x = 0 To 3
     If EngineRunning(x) Then
@@ -228,13 +228,13 @@ For x = 0 To 3
 Next
 
 'Calculate Average values, with a DivZero check
-150 data.EnginesStarted = (EnginesRunning > 0)
+data.EnginesStarted = (EnginesRunning > 0)
 
 'Build flags
 Dim isAP As Boolean
 isAP = (apMode = 1)
 
-160 data.Paused = (isPaused = 1)
+data.Paused = (isPaused = 1)
 data.Slewing = (isSlew = 1)
 data.Parked = (isParkBrake = 32767)
 data.onGround = (isOnGround = 1)
@@ -249,7 +249,7 @@ data.AT_IAS = (IASmode = 1)
 data.AT_MCH = (MCHmode = 1)
 
 'Save sim rate
-170 data.simRate = RawSimRate
+data.simRate = RawSimRate
 
 'Return flight position data
 Set RecordFlightData = data
@@ -297,10 +297,20 @@ Public Function PhaseChanged(cPos As PositionData) As Boolean
                 TakeoffCheckCount = 0
             End If
             
-            If (TakeoffCheckCount > 15) Then
+            If ((TakeoffCheckCount > 15) Or (cPos.AirSpeed > 60)) Then
                 info.Phase = "Takeoff"
                 info.TakeoffTime = Now
                 If config.SB3Connected Then SB3Transponder (True)
+                PhaseChanged = True
+            ElseIf Not cPos.onGround And (cPos.AltitudeAGL > 7) Then
+                info.Phase = "Airborne"
+                info.TimeOff = Now
+                info.TakeoffTime = Now
+                If config.SB3Connected Then SB3Transponder (True)
+                info.TakeoffSpeed = cPos.AirSpeed
+                info.TakeoffFuel = cPos.Fuel
+                info.TakeoffWeight = cPos.Weight
+                info.TakeoffN1 = cPos.AverageN1
                 PhaseChanged = True
             End If
 
@@ -337,6 +347,10 @@ Public Function PhaseChanged(cPos As PositionData) As Boolean
                 info.Phase = "Taxi In"
                 info.TaxiInTime = Now
                 If config.SB3Connected Then SB3Transponder (False)
+                PhaseChanged = True
+            ElseIf Not cPos.onGround Then
+                info.Phase = "Airborne"
+                If config.SB3Connected Then SB3Transponder (True)
                 PhaseChanged = True
             End If
 

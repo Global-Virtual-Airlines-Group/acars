@@ -19,12 +19,13 @@ Private Const REG_SETTINGS_KEY = "SOFTWARE\Delta Virtual Airlines\ACARS"
 
 'Airport configuration file
 Private Const AIRPORT_DATA = "airports.cfg"
+Private Const EQ_DATA = "eqTypes.cfg"
 
 'Server connection constants.
 Private Const DEFAULT_ACARS_HOST = "golgotha.deltava.org"
 Private Const DEFAULT_ACARS_PORT = 15527
 Private Const DEFAULT_POS_INTERVAL = 30
-Private Const DEFAULT_PING_INTERVAL = 35
+Private Const DEFAULT_PING_INTERVAL = 45
 
 'ACARS Server data
 Private ACARS_Host As String
@@ -38,7 +39,6 @@ Private aCodes As Variant
 Public FSUIPCConnected As Boolean
 Public ACARSConnected As Boolean
 Public SeenHELO As Boolean
-Public DataUpdated As Boolean
 
 'Menu options
 Public FlyOffline As Boolean
@@ -55,6 +55,12 @@ Public PositionInterval As Integer
 Public SB3Support As Boolean
 Public SB3Installed As Boolean
 Public SB3Connected As Boolean
+
+'IVAp Support info
+Public IVAPSupport As Boolean
+Public IVAPInstalled As Boolean
+Public IVAPConnected As Boolean
+
 Public PrivateVoiceURL As String
 
 Public Sub Class_Initialize()
@@ -76,6 +82,7 @@ Public Sub Class_Initialize()
     info.Remarks = RegReadString(HKEY_CURRENT_USER, REG_SETTINGS_KEY, "Remarks", "")
     info.AirportD = RegReadString(HKEY_CURRENT_USER, REG_SETTINGS_KEY, "AirportD", "")
     info.AirportA = RegReadString(HKEY_CURRENT_USER, REG_SETTINGS_KEY, "AirportA", "")
+    info.AirportL = RegReadString(HKEY_CURRENT_USER, REG_SETTINGS_KEY, "AirportL", "")
     
     'Load the Pilot ID from alternate source if not found
     If (frmMain.txtPilotID.Text = "") Then
@@ -96,6 +103,7 @@ Public Sub Class_Initialize()
     ShowTimestamps = RegReadBoolean(HKEY_LOCAL_MACHINE, REG_SETTINGS_KEY, "ShowTimestamps", True)
     ShowDebug = RegReadBoolean(HKEY_LOCAL_MACHINE, REG_SETTINGS_KEY, "ShowDebug", False)
     SB3Support = RegReadBoolean(HKEY_LOCAL_MACHINE, REG_SETTINGS_KEY, "SB3Support", False) And SB3Installed
+    IVAPSupport = RegReadBoolean(HKEY_LOCAL_MACHINE, REG_SETTINGS_KEY, "IVAPSupport", False) And False
 End Sub
 
 Public Sub UpdateSettingsMenu()
@@ -106,6 +114,7 @@ Public Sub UpdateSettingsMenu()
     frmMain.mnuOptionsShowDebugMessages.Checked = ShowDebug
     frmMain.mnuOptionsSB3Support.Enabled = SB3Installed
     frmMain.mnuOptionsSB3Support.Checked = SB3Support
+    frmMain.mnuOptionsIVAPSupport.Checked = IVAPSupport
     
     'Update SB3 support
     frmMain.mnuSaveFlightPlan.Enabled = SB3Support
@@ -117,6 +126,7 @@ Public Sub UpdateFlightInfo()
     frmMain.txtRoute.Text = info.Route
     frmMain.cboAirportD.ListIndex = GetAirport(info.AirportD) + 1
     frmMain.cboAirportA.ListIndex = GetAirport(info.AirportA) + 1
+    frmMain.cboAirportL.ListIndex = GetAirport(info.AirportL) + 1
 End Sub
 
 Public Sub Save()
@@ -128,6 +138,7 @@ Public Sub Save()
     RegWriteString HKEY_CURRENT_USER, REG_SETTINGS_KEY, "Altitude", info.CruiseAltitude
     RegWriteString HKEY_CURRENT_USER, REG_SETTINGS_KEY, "AirportD", info.AirportD
     RegWriteString HKEY_CURRENT_USER, REG_SETTINGS_KEY, "AirportA", info.AirportA
+    RegWriteString HKEY_CURRENT_USER, REG_SETTINGS_KEY, "AirportL", info.AirportL
     RegWriteString HKEY_CURRENT_USER, REG_SETTINGS_KEY, "Route", info.Route
     RegWriteString HKEY_CURRENT_USER, REG_SETTINGS_KEY, "Remarks", info.Remarks
 
@@ -138,6 +149,7 @@ Public Sub Save()
     RegWriteBoolean HKEY_LOCAL_MACHINE, REG_SETTINGS_KEY, "ShowTimestamps", ShowTimestamps
     RegWriteBoolean HKEY_LOCAL_MACHINE, REG_SETTINGS_KEY, "ShowDebug", ShowDebug
     RegWriteBoolean HKEY_LOCAL_MACHINE, REG_SETTINGS_KEY, "SB3Support", SB3Support
+    RegWriteBoolean HKEY_LOCAL_MACHINE, REG_SETTINGS_KEY, "IVAPSupport", IVAPSupport
 End Sub
 
 Property Get ACARSHost() As String
@@ -176,6 +188,68 @@ Public Sub ClearEquipment()
     eqTypes = Array()
 End Sub
 
+Public Function IsConfigUpToDate() As Boolean
+    Dim apDate As Date
+    Dim eqDate As Date
+    Dim age As Integer
+
+    'Calculate average age of the data files
+    apDate = FileDateTime(App.Path + "\" + AIRPORT_DATA)
+    eqDate = FileDateTime(App.Path + "\" + EQ_DATA)
+    age = (DateDiff("d", apDate, Now) + DateDiff("d", eqDate, Now)) / 2
+    
+    IsConfigUpToDate = (age <= 21)
+End Function
+
+Public Sub SaveEquipment()
+    Dim fNum As Integer
+    Dim x As Integer
+    
+    On Error GoTo FatalError
+    
+    fNum = FreeFile()
+    Open App.Path + "\" + EQ_DATA For Output As #fNum
+    For x = 0 To UBound(eqTypes)
+        Print #fNum, eqTypes(x)
+    Next
+
+    Close #fNum
+    
+ExitSub:
+    Exit Sub
+    
+FatalError:
+    MsgBox "Cannot save Equipment Types!", vbOKOnly + vbCritical, "I/O Error"
+    Resume ExitSub
+
+End Sub
+
+Public Sub LoadEquipment()
+    Dim fNum As Integer
+    Dim rawData As Variant
+    Dim eq As Variant
+    
+    On Error GoTo FatalError
+    
+    fNum = FreeFile()
+    Open App.Path + "\" + EQ_DATA For Input As #fNum
+    rawData = Split(Input(LOF(fNum), fNum), vbCrLf)
+    Close #fNum
+    
+    ClearEquipment
+    For Each eq In rawData
+        AddEquipment eq
+    Next
+    
+ExitSub:
+    Exit Sub
+    
+FatalError:
+    MsgBox "Cannot load Equipment Types!", vbOKOnly + vbCritical, "I/O Error"
+    Resume ExitSub
+    
+End Sub
+
 Public Sub ClearAirports()
     aNames = Array()
     aCodes = Array()
@@ -185,6 +259,8 @@ Public Sub SaveAirports()
     Dim fNum As Integer
     Dim x As Integer
     
+    On Error GoTo FatalError
+    
     fNum = FreeFile()
     Open App.Path + "\" + AIRPORT_DATA For Output As #fNum
     For x = 0 To UBound(aNames)
@@ -192,6 +268,14 @@ Public Sub SaveAirports()
     Next
     
     Close #fNum
+    
+ExitSub:
+    Exit Sub
+    
+FatalError:
+    MsgBox "Cannot save Airport data!", vbOKOnly + vbCritical, "I/O Error"
+    Resume ExitSub
+
 End Sub
 
 Public Sub LoadAirports()
@@ -199,6 +283,8 @@ Public Sub LoadAirports()
     Dim rawData As Variant
     Dim apData As Variant
     Dim rawAirport As Variant
+    
+    On Error GoTo FatalError
 
     fNum = FreeFile()
     Open App.Path + "\" + AIRPORT_DATA For Input As #fNum
@@ -209,6 +295,14 @@ Public Sub LoadAirports()
         apData = Split(rawAirport, ",")
         If (UBound(apData) > 0) Then AddAirport apData(0), apData(1)
     Next
+    
+ExitSub:
+    Exit Sub
+    
+FatalError:
+    MsgBox "Cannot load Airport data!", vbOKOnly + vbCritical, "I/O Error"
+    Resume ExitSub
+
 End Sub
 
 Public Function GetAirport(ByVal code As String) As Integer
@@ -224,10 +318,20 @@ Public Function GetAirport(ByVal code As String) As Integer
     GetAirport = 0
 End Function
 
-Public Sub SaveFlightID(flightID As Long)
-    RegWriteDWORD HKEY_CURRENT_USER, REG_SETTINGS_KEY, "FlightID", flightID
+Public Sub SaveFlightInfo(FlightID As Long, Optional startTime As Date)
+    If (FlightID > 0) Then
+        RegWriteDWORD HKEY_CURRENT_USER, REG_SETTINGS_KEY, "FlightID", FlightID
+        RegWriteString HKEY_CURRENT_USER, REG_SETTINGS_KEY, "FlightStartTime", CStr(startTime)
+    Else
+        RegDelValue HKEY_CURRENT_USER, REG_SETTINGS_KEY, "FlightID"
+        RegDelValue HKEY_CURRENT_USER, REG_SETTINGS_KEY, "FlightStartTime"
+    End If
 End Sub
 
-Public Function LoadFlightID() As Long
-    LoadFlightID = RegReadDWORD(HKEY_CURRENT_USER, REG_SETTINGS_KEY, "FlightID", 0)
+Public Function LoadFlightInfo() As FlightData
+    Dim fInfo As New FlightData
+    
+    fInfo.FlightID = RegReadDWORD(HKEY_CURRENT_USER, REG_SETTINGS_KEY, "FlightID", 0)
+    fInfo.startTime = CDate(RegReadString(HKEY_CURRENT_USER, REG_SETTINGS_KEY, "FlightStartTime", CStr(Now)))
+    Set LoadFlightInfo = fInfo
 End Function

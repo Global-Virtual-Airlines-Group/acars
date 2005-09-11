@@ -53,10 +53,12 @@ End Sub
 
 Public Sub SendFlightInfo(fInfo As FlightData)
     Dim cmd As IXMLDOMElement
+    Dim utcDate As New PositionDate
 
     'Build the request and save the number
     Set cmd = buildCMD("flight_info")
     fInfo.InfoReqID = ReqStack.RequestID
+    utcDate.LocalTime = fInfo.startTime
     
     'Add flight plan info
     AddXMLField cmd, "flight_num", fInfo.FlightNumber
@@ -66,12 +68,13 @@ Public Sub SendFlightInfo(fInfo As FlightData)
     AddXMLField cmd, "airportA", fInfo.AirportA
     AddXMLField cmd, "route", fInfo.Route
     AddXMLField cmd, "remarks", fInfo.Remarks
+    AddXMLField cmd, "startTime", Format(utcDate.UTCTime, "mm/dd/yyyy hh:nn:ss")
     AddXMLField cmd, "fs_ver", CStr(fInfo.FSVersion)
     If fInfo.Offline Then AddXMLField cmd, "offline", "true"
     If (fInfo.Phase = "Completed") Then AddXMLField cmd, "complete", "true"
-    If (fInfo.flightID > 0) Then
-        AddXMLField cmd, "flight_id", CStr(fInfo.flightID)
-        ShowMessage "Resuming Flight " + CStr(fInfo.flightID), ACARSTEXTCOLOR
+    If (fInfo.FlightID > 0) Then
+        AddXMLField cmd, "flight_id", CStr(fInfo.FlightID)
+        ShowMessage "Resuming Flight " + CStr(fInfo.FlightID), ACARSTEXTCOLOR
     End If
     
     ReqStack.Queue cmd
@@ -179,6 +182,7 @@ Public Function SendCredentials(userID As String, pwd As String) As Long
     'Add user and password
     AddXMLField cmd, "user", userID
     AddXMLField cmd, "password", pwd
+    AddXMLField cmd, "build", App.Revision
     ReqStack.Queue cmd
 
     If config.ShowDebug Then ShowMessage "Logging In", DEBUGTEXTCOLOR
@@ -223,7 +227,7 @@ Public Sub RequestAirports()
     If config.ShowDebug Then ShowMessage "Sent airport list request", DEBUGTEXTCOLOR
 End Sub
 
-Public Sub SendPosition(ByVal cPos As PositionData)
+Public Function SendPosition(ByVal cPos As PositionData, Optional noFlood As Boolean = False) As Long
     Dim cmd As IXMLDOMElement
     Dim utcDate As Date
     Dim flags As Integer
@@ -250,6 +254,7 @@ Public Sub SendPosition(ByVal cPos As PositionData)
     AddXMLField cmd, "fuel", CStr(cPos.Fuel)
     AddXMLField cmd, "weight", CStr(cPos.Weight)
     AddXMLField cmd, "date", Format(utcDate, "mm/dd/yyyy hh:nn:ss")
+    If noFlood Then AddXMLField cmd, "noFlood", "true"
 
     'Build the flags
     If cPos.Paused Then flags = flags Or FLIGHTPAUSED
@@ -270,7 +275,8 @@ Public Sub SendPosition(ByVal cPos As PositionData)
     'Send the request
     ReqStack.Queue cmd
     If config.ShowDebug Then ShowMessage "Sent position update", DEBUGTEXTCOLOR
-End Sub
+    SendPosition = ReqStack.RequestID
+End Function
 
 Public Function SendPIREP(info As FlightData) As Long
     Dim cmd As IXMLDOMElement
@@ -279,14 +285,14 @@ Public Function SendPIREP(info As FlightData) As Long
     Set cmd = buildCMD("pirep")
 
     'Add pirep info fields
-    AddXMLField cmd, "flightID", CStr(info.flightID)
+    AddXMLField cmd, "flightID", CStr(info.FlightID)
     AddXMLField cmd, "flightcode", info.FlightNumber
     AddXMLField cmd, "eqType", info.EquipmentType
     AddXMLField cmd, "airportD", info.AirportD
     AddXMLField cmd, "airportA", info.AirportA
     AddXMLField cmd, "remarks", info.Remarks
     AddXMLField cmd, "network", info.Network
-    AddXMLField cmd, "startTime", Format(info.StartTime, "mm/dd/yyyy hh:nn:ss")
+    AddXMLField cmd, "startTime", Format(info.startTime, "mm/dd/yyyy hh:nn:ss")
     AddXMLField cmd, "taxiOutTime", Format(info.TaxiOutTime, "mm/dd/yyyy hh:nn:ss")
     AddXMLField cmd, "taxiFuel", CStr(info.TaxiFuel)
     AddXMLField cmd, "taxiWeight", CStr(info.TaxiWeight)

@@ -18,10 +18,11 @@ Begin VB.Form frmSplash
       Italic          =   0   'False
       Strikethrough   =   0   'False
    EndProperty
+   Icon            =   "frmSplash.frx":0000
    LinkTopic       =   "Form1"
    MaxButton       =   0   'False
    MinButton       =   0   'False
-   Picture         =   "frmSplash.frx":0000
+   Picture         =   "frmSplash.frx":08CA
    ScaleHeight     =   6750
    ScaleWidth      =   9000
    ShowInTaskbar   =   0   'False
@@ -64,7 +65,6 @@ End Sub
 
 Private Sub Form_Load()
     VersionLabel.Caption = "Version " + CStr(App.Major) + "." + CStr(App.Minor) + _
-        " (Build " + Format(App.Revision, "000") + "), Expires on " + _
-        Format(modMain.ExpiryDate, "mmmm dd, yyyy")
+        " (Build " + Format(App.Revision, "000") + ")"
 End Sub
 

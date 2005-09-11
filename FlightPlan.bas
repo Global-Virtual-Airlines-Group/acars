@@ -31,6 +31,7 @@ Public Sub FPlan_Open()
         Case "sfp"
             info.AirportD = ReadINI("SBFlightPlan", "Departure", info.AirportD, planFileName)
             info.AirportA = ReadINI("SBFlightPlan", "Arrival", info.AirportA, planFileName)
+            info.AirportL = ReadINI("SBFlightPlan", "Alternate", info.AirportL, planFileName)
             info.CruiseAltitude = ReadINI("SBFlightPlan", "Altitude", info.CruiseAltitude, planFileName)
             info.Route = ReadINI("SBFlightPlan", "Route", info.Route, planFileName)
             info.Remarks = ReadINI("SBFlightPlan", "Remarks", info.Remarks, planFileName)
@@ -79,6 +80,7 @@ Public Sub SB3Plan_Save()
     'Write the INI file
     WriteINI "SBFlightPlan", "Departure", info.AirportD, planFileName
     WriteINI "SBFlightPlan", "Arrival", info.AirportA, planFileName
+    WriteINI "SBFlightPlan", "Alternate", info.AirportL, planFileName
     WriteINI "SBFlightPlan", "Altitude", info.CruiseAltitude, planFileName
     WriteINI "SBFlightPlan", "Route", info.Route, planFileName
     WriteINI "SBFlightPlan", "Remarks", info.Remarks, planFileName

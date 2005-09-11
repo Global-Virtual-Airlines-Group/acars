@@ -1,7 +1,23 @@
 Attribute VB_Name = "RequestReceiver"
 Option Explicit
 
+Private LastID As Long
 Public Const XMLRESPONSEROOT = "ACARSResponse"
+
+Public Function WaitForACK(id As Long, Optional Timeout As Integer = 2500) As Boolean
+    Dim totalTime As Integer
+    
+    While (totalTime < Timeout)
+        If (LastID = id) Then
+            WaitForACK = True
+            Exit Function
+        End If
+        
+        totalTime = totalTime + 50
+        Sleep 50
+        DoEvents
+    Wend
+End Function
 
 Private Function getChild(node As IXMLDOMNode, name As String, Optional defVal As String)
     Dim e As IXMLDOMNode
@@ -61,6 +77,7 @@ Public Sub ProcessMessage(ByVal msgText As String)
         
             'Get the request ID
             ReqID = Val("&H" + getAttr(cmd, "id", "0"))
+            LastID = ReqID
             
             'Take appropriate action based on request ID specified in the error.
             Select Case ReqID
@@ -101,13 +118,12 @@ ExitSub:
     Exit Sub
     
 ErrorHandler:
-    ShowMessage "Error Processing ACARS Response - (Line " + CStr(Erl) + ") " + Error$(err), ACARSERRORCOLOR
+    ShowMessage "Error Processing ACARS Response - " + Error$(err), ACARSERRORCOLOR
     Resume ExitSub
 End Sub
 
 Private Sub ProcessACK(cmdNode As IXMLDOMNode)
     Dim ReqID As Long
-    Static LastID As Long
     
     ReqID = Val("&H" + getAttr(cmdNode, "id", "0"))
     If (ReqID = LastID) Then Exit Sub
@@ -118,31 +134,29 @@ Private Sub ProcessACK(cmdNode As IXMLDOMNode)
     If ReqID = info.AuthReqID Then
         frmMain.sbMain.Panels(1).Text = "Status: Logged in to ACARS server"
         PlaySoundFile "notify_msg.wav"
-        If Not config.DataUpdated Then
+        If Not config.IsConfigUpToDate Then
             RequestEquipment
             RequestAirports
-            If config.SB3Support Then RequestPrivateVoiceURL
-            config.DataUpdated = True
         End If
         
+        If config.SB3Support Then RequestPrivateVoiceURL
         RequestPilotList
-        If (info.flightID <> 0) Then SendFlightInfo info
+        If (info.FlightID <> 0) Then SendFlightInfo info
         ReqStack.Send
         DoEvents
     ElseIf ReqID = info.InfoReqID Then
-        info.flightID = CLng(getChild(cmdNode, "flight_id", "0"))
-        ShowMessage "Assigned Flight ID " + CStr(info.flightID), ACARSTEXTCOLOR
+        info.FlightID = CLng(getChild(cmdNode, "flight_id", "0"))
+        ShowMessage "Assigned Flight ID " + CStr(info.FlightID), ACARSTEXTCOLOR
 
         'Save the flight ID to the registry for crash recovery.
-        config.SaveFlightID info.flightID
+        config.SaveFlightInfo info.FlightID, info.startTime
     ElseIf ReqID = info.PIREPReqID Then
         info.PIREPFiled = True
-        info.flightID = 0
-        positions.Clear
+        info.FlightID = 0
         frmMain.cmdPIREP.Visible = False
         frmMain.cmdPIREP.Enabled = False
         info.FlightData = False
-        MsgBox "Flight Report filed Successfully", vbInformation + vbOKOnly
+        MsgBox "Flight Report filed Successfully.", vbInformation + vbOKOnly
     End If
 End Sub
 
@@ -339,6 +353,7 @@ Private Sub ProcessDataResponse(cmdNode As IXMLDOMNode)
                 
                     If config.ShowDebug Then ShowMessage "Updating Equipment List", DEBUGTEXTCOLOR
                     SetComboChoices frmMain.cboEquipment, config.EquipmentTypes
+                    config.SaveEquipment
                 End If
             End If
             

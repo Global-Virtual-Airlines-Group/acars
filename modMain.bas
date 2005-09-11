@@ -17,8 +17,6 @@ Public Const ACARSVERSION = 1
 Public Const FSUIPCKEY = ""
 Public Const FSUIPCREGOFFSET = &H8001&
 
-Public Const ExpiryDate = #9/25/2005#
-
 'Message color constants.
 Public Const ACARSTEXTCOLOR = &H109900
 Public Const DEBUGTEXTCOLOR = &HAAAAAA
@@ -46,37 +44,29 @@ Public intRetryFSConnection As Integer
 
 Sub Main()
     frmSplash.Show
-
-    'Make sure we haven't expired.
-    If (ExpiryDate < Now) Then
-        MsgBox "This beta version of ACARS has expired. Please download a new version.", vbOKOnly Or vbCritical, "Expired"
-        End
-    End If
-
-    'Warn of upcoming expiration if necessary.
-    If (DateDiff("d", Now, ExpiryDate) < 10) Then
-        MsgBox "WARNING: This beta version of ACARS will expire on " + Format(ExpiryDate, "mmmm d, yyyy") + ". Please go to http://www.deltava.org/ for a new version.", vbOKOnly Or vbExclamation, "Expiring Soon!"
-    End If
+    frmMain.Icon = frmSplash.Icon
 
     'Make sure we're not already running.
     If App.PrevInstance = True Then
-        MsgBox "DVA ACARS is already running!", vbOKOnly Or vbExclamation, "Error"
+        MsgBox App.ProductName + " is already running!", vbOKOnly Or vbExclamation, "Error"
         End
     End If
     
     'Load configuration
     Set config = New Configuration
     config.LoadAirports
+    config.LoadEquipment
     
     'Check for existing flight
-    Dim oldFlightID As Long
-    oldFlightID = config.LoadFlightID
-    If (oldFlightID <> 0) Then
+    Dim oldInfo As FlightData
+    Set oldInfo = config.LoadFlightInfo
+    If (oldInfo.FlightID <> 0) Then
         If (MsgBox("You apparently had a flight in progress. Do you want to resume it?", _
             vbYesNo + vbExclamation, "Resume Flight") = vbYes) Then
-            info.flightID = oldFlightID
+            info.FlightID = oldInfo.FlightID
+            info.startTime = oldInfo.startTime
         Else
-            config.SaveFlightID 0
+            config.SaveFlightInfo 0
         End If
     End If
     
@@ -84,6 +74,7 @@ Sub Main()
     SetComboChoices frmMain.cboEquipment, config.EquipmentTypes, info.EquipmentType
     SetComboChoices frmMain.cboAirportD, config.AirportNames
     SetComboChoices frmMain.cboAirportA, config.AirportNames
+    SetComboChoices frmMain.cboAirportL, config.AirportNames
     config.UpdateSettingsMenu
     config.UpdateFlightInfo
     
@@ -130,7 +121,8 @@ Sub Main()
 
     'Display the main form.
     frmMain.Show
-    ShowMessage App.Title & " version " & App.Major & "." & App.Minor & "." & App.Revision & " started", ACARSTEXTCOLOR
+    ShowMessage App.Title & " version " & App.Major & "." & App.Minor & " (Build " & _
+        App.Revision & ") started", ACARSTEXTCOLOR
 
     'Set focus in command line text box.
     frmMain.txtCmd.SetFocus
@@ -203,6 +195,20 @@ Public Function FSUIPCConnect() As Boolean
             End If
         End If
         
+        'Get FS Versions
+        Dim FSNames As Variant
+        FSNames = Array("?", "FS98", "FS2000", "CFS2", "CFS1", "?", "FS2002", "FS2004")
+        
+        'Get the Flight Simulator version
+        Dim FSVer As Integer
+        Call FSUIPC_Read(&H3308, 2, VarPtr(FSVer), dwResult)
+        If Not FSUIPC_Process(dwResult) Then Exit Function
+        
+        'Log FS Version
+        If config.ShowDebug Then ShowMessage "Connected to " & FSNames(FSVer), DEBUGTEXTCOLOR
+            
+        'Save FS Version
+        info.FSVersion = FSVer
         config.FSUIPCConnected = True
         FSUIPCConnect = True
     Else

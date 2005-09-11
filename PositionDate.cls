@@ -42,16 +42,17 @@ Private Function ConvertSYSTEMTIME(systime As SYSTEMTIME) As Date
 End Function
 
 Public Sub Class_Initialize()
-    Dim dt As Date
-    
-    dt = Now
+    Me.LocalTime = Now
+End Sub
+
+Property Let LocalTime(dt As Date)
     LocalSystemTime.wYear = Year(dt)
     LocalSystemTime.wMonth = Month(dt)
     LocalSystemTime.wDay = Day(dt)
     LocalSystemTime.wHour = Hour(dt)
     LocalSystemTime.wMinute = Minute(dt)
     LocalSystemTime.wSecond = Second(dt)
-End Sub
+End Property
 
 Property Get LocalTime() As Date
     LocalTime = ConvertSYSTEMTIME(LocalSystemTime)

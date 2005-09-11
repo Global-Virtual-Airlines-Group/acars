@@ -47,30 +47,30 @@ Private Function convertADF(ByVal freq As String) As Long
 End Function
 
 Public Sub setNAV1(freq As String, hdg As Integer)
-    Dim freq As Integer
+    Dim frq As Integer
     Dim lngResult As Long
 
     'Write the frequency/heading
-    freq = convertNAVCOM(freq)
-    Call FSUIPC_Write(&H350, 2, VarPtr(freq), lngResult)
+    frq = convertNAVCOM(freq)
+    Call FSUIPC_Write(&H350, 2, VarPtr(frq), lngResult)
     Call FSUIPC_Write(&HC4E, 2, VarPtr(hdg), lngResult)
     
     'Tell FS that the NAV freq changesd
     Call FSUIPC_Write(&H388, 1, VarPtr(navRadioReset), lngResult)
-    If Not FSUIPC_Process(lngResult) Then ShowMessage "Error setting NAV1"
+    If Not FSUIPC_Process(lngResult) Then ShowMessage "Error setting NAV1", ACARSERRORCOLOR
 End Sub
 
 Public Sub SetNAV2(freq As String)
-    Dim freq As Integer
+    Dim frq As Integer
     Dim lngResult As Long
 
     'Write the frequency
-    freq = convertNAVCOM(freq)
-    Call FSUIPC_Write(&H352, 2, VarPtr(freq), lngResult)
+    frq = convertNAVCOM(freq)
+    Call FSUIPC_Write(&H352, 2, VarPtr(frq), lngResult)
                         
     'Tell FS that the NAV freq changesd
     Call FSUIPC_Write(&H388, 1, VarPtr(navRadioReset), lngResult)
-    If Not FSUIPC_Process(lngResult) Then ShowMessage "Error setting NAV2"
+    If Not FSUIPC_Process(lngResult) Then ShowMessage "Error setting NAV2", ACARSERRORCOLOR
 End Sub
 
 Public Sub SetCOM1(freq As String)

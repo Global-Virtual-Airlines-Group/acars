@@ -14,13 +14,14 @@ Attribute VB_Exposed = False
 Option Explicit
 
 'Flight information
-Public flightID As Long
+Public FlightID As Long
 
 Public EquipmentType As String
 Public FlightNumber As String
 Public CruiseAltitude As String
 Public AirportA As String
 Public AirportD As String
+Public AirportL As String
 Public Route As String
 Public Remarks As String
 Public Network As String
@@ -40,7 +41,7 @@ Private Info_ReqID As Long
 Private PIREP_ReqID As Long
 
 'Flight Start Data
-Public StartTime As Date
+Public startTime As Date
 Public TimeOut As Date
 Public TaxiOutTime As Date
 Public TaxiFuel As Long
@@ -86,7 +87,7 @@ Sub StartFlight()
     FlightData = False
     PIREPFiled = False
     Phase = "Preflight"
-    StartTime = Now
+    startTime = Now
 End Sub
 
 'Updates flight time
