@@ -4,11 +4,14 @@ Option Explicit
 Private LastID As Long
 Public Const XMLRESPONSEROOT = "ACARSResponse"
 
-Public Function WaitForACK(id As Long, Optional Timeout As Integer = 2500) As Boolean
+Public Function WaitForACK(ByRef ID As Long, Optional ByVal TimeOut As Integer = 2500) As Boolean
     Dim totalTime As Integer
     
-    While (totalTime < Timeout)
-        If (LastID = id) Then
+    While (totalTime < TimeOut)
+        If (LastID = ID) Then
+            WaitForACK = True
+            Exit Function
+        ElseIf (ID = 0) Then
             WaitForACK = True
             Exit Function
         End If
@@ -17,28 +20,6 @@ Public Function WaitForACK(id As Long, Optional Timeout As Integer = 2500) As Bo
         Sleep 50
         DoEvents
     Wend
-End Function
-
-Private Function getChild(node As IXMLDOMNode, name As String, Optional defVal As String)
-    Dim e As IXMLDOMNode
-
-    Set e = node.selectSingleNode(name)
-    If (e Is Nothing) Then
-        getChild = defVal
-    Else
-        getChild = Trim(e.Text)
-    End If
-End Function
-
-Private Function getAttr(node As IXMLDOMNode, name As String, Optional defVal As String)
-    Dim e As IXMLDOMAttribute
-    
-    Set e = node.Attributes.getNamedItem(name)
-    If (e Is Nothing) Then
-        getAttr = defVal
-    Else
-        getAttr = Trim(e.Text)
-    End If
 End Function
 
 Public Sub ProcessMessage(ByVal msgText As String)
@@ -56,11 +37,13 @@ Public Sub ProcessMessage(ByVal msgText As String)
         
         Set xmlError = doc.parseError
         strError = "Error code: " & xmlError.errorCode & vbCrLf _
-            & "Reason: " & xmlError.reason & vbCrLf _
+            & "Reason: " & xmlError.Reason & vbCrLf _
             & "Source: " & vbCrLf & xmlError.srcText
         MsgBox "The following fatal error occurred while parsing XML from the server:" & vbCrLf & vbCrLf & strError, vbCritical Or vbOKOnly, "Fatal Error!"
-        ShowMessage msgText, DEBUGTEXTCOLOR
+        If config.ShowDebug Then ShowDebug msgText, DEBUGTEXTCOLOR
         Exit Sub
+    Else
+        If config.ShowDebug Then ShowDebug msgText, XML_IN_COLOR
     End If
     
     'Grab all CMD nodes
@@ -75,13 +58,12 @@ Public Sub ProcessMessage(ByVal msgText As String)
         Else
             Dim ReqID As Long
         
-            'Get the request ID
-            ReqID = Val("&H" + getAttr(cmd, "id", "0"))
-            LastID = ReqID
-            
             'Take appropriate action based on request ID specified in the error.
+            ReqID = Val("&H" + getAttr(cmd, "id", "0"))
+            PlaySoundFile "notify_error.wav"
             Select Case ReqID
                 Case info.AuthReqID
+                    info.AuthReqID = 0
                     frmMain.CloseACARSConnection False
                     MsgBox "The following error occurred while attempting to connect to the ACARS server:" & vbCrLf & vbCrLf & getChild(cmd, "error", "?"), vbOKOnly Or vbExclamation, "Error"
                 Case info.PIREPReqID
@@ -97,7 +79,7 @@ Private Sub ProcessResponse(cmd As IXMLDOMNode)
     Dim cmdName As String
     
     'Set critical error handler
-    On Error GoTo ErrorHandler
+    'On Error GoTo ErrorHandler
     
     'Branch depending on type of command.
     cmdName = LCase(getAttr(cmd, "type", ""))
@@ -118,22 +100,69 @@ ExitSub:
     Exit Sub
     
 ErrorHandler:
-    ShowMessage "Error Processing ACARS Response - " + Error$(err), ACARSERRORCOLOR
+    ShowMessage "Error Processing ACARS " + cmdName + " Response - " + err.Description, ACARSERRORCOLOR
     Resume ExitSub
 End Sub
 
 Private Sub ProcessACK(cmdNode As IXMLDOMNode)
     Dim ReqID As Long
+    Dim RequestInfo As Boolean
     
     ReqID = Val("&H" + getAttr(cmdNode, "id", "0"))
     If (ReqID = LastID) Then Exit Sub
     
     If config.ShowDebug Then ShowMessage "Received ACK for " + Hex(ReqID), DEBUGTEXTCOLOR
     LastID = ReqID
+    
+    'Check if we are requesting flight information
+    RequestInfo = CBool(getChild(cmdNode, "sendInfo", "false"))
+    If RequestInfo Then
+        ShowMessage "Requesting Flight Information", ACARSTEXTCOLOR
+        SendFlightInfo info
+        ReqStack.Send
+    End If
             
+    'Do special things if we're responding to a message
     If ReqID = info.AuthReqID Then
+        Dim newBuild As Integer
+        Dim RoleNames As Variant
+        Dim rName As Variant
+    
+        'Enable stuff and update status
         frmMain.sbMain.Panels(1).Text = "Status: Logged in to ACARS server"
-        PlaySoundFile "notify_msg.wav"
+        frmMain.SSTab1.TabEnabled(1) = True
+        frmMain.mnuOptionsFlyOffline.enabled = False
+        If config.TS2Support Then
+            frmMain.SSTab1.TabEnabled(4) = True
+            frmMain.SSTab1.TabVisible(4) = True
+        End If
+        
+        'Display newer build if available
+        newBuild = CInt(getChild(cmdNode, "latestBuild", "0"))
+        If (newBuild > App.Revision) Then
+            ShowMessage "A new ACARS version (Build " + CStr(newBuild) + ") is available.", ACARSTEXTCOLOR
+            PlaySoundFile "notify_newversion.wav"
+        Else
+            PlaySoundFile "notify_msg.wav"
+        End If
+        
+        'Get role names
+        config.ClearRoles
+        RoleNames = Split(getChild(cmdNode, "roles", ""), ",")
+        For Each rName In RoleNames
+            config.AddRole rName
+        Next
+        
+        'Get unrestricted flag
+        config.NoMessages = CBool(getChild(cmdNode, "noMsgs", "false"))
+        config.IsUnrestricted = CBool(getChild(cmdNode, "unrestricted", "false")) And Not config.NoMessages
+        If config.IsUnrestricted And config.ShowDebug Then
+            ShowMessage "Unrestricted messaging operations", DEBUGTEXTCOLOR
+        ElseIf config.NoMessages Then
+            ShowMessage "ACARS Messaging disabled", SYSMSGCOLOR
+        End If
+        
+        'Update Equipment/Airport comboboxes
         If Not config.IsConfigUpToDate Then
             RequestEquipment
             RequestAirports
@@ -141,22 +170,52 @@ Private Sub ProcessACK(cmdNode As IXMLDOMNode)
         
         If config.SB3Support Then RequestPrivateVoiceURL
         RequestPilotList
-        If (info.FlightID <> 0) Then SendFlightInfo info
+        If info.InFlight Or info.FlightData Then SendFlightInfo info
         ReqStack.Send
         DoEvents
     ElseIf ReqID = info.InfoReqID Then
-        info.FlightID = CLng(getChild(cmdNode, "flight_id", "0"))
-        ShowMessage "Assigned Flight ID " + CStr(info.FlightID), ACARSTEXTCOLOR
+        Dim newID As Long
+        Dim isCheckRide As Boolean
+    
+        'Get the flight ID
+        newID = CLng(getChild(cmdNode, "flight_id", "0"))
+        If (info.FlightID = 0) Then
+            ShowMessage "Assigned Flight ID " + CStr(newID), ACARSTEXTCOLOR
+        ElseIf (newID <> info.FlightID) Then
+            ShowMessage "Requested Flight ID " + CStr(info.FlightID) + ", received " + CStr(newID), ACARSTEXTCOLOR
+        End If
+        
+        'Check the check ride flag
+        isCheckRide = CBool(getChild(cmdNode, "checkRide", "false"))
+        If isCheckRide Then
+            isCheckRide = (MsgBox("You have a pending " & info.EquipmentType & " Check Ride" & _
+                vbCrLf & vbCrLf & "Are you flying the Check Ride now?", vbQuestion + vbYesNo, _
+                "Pending Check Ride") = vbYes)
+        End If
+        
+        'Delete any old persisted flight and then save the flight with the new ID
+        DeleteSavedFlight SavedFlightID(info)
 
         'Save the flight ID to the registry for crash recovery.
-        config.SaveFlightInfo info.FlightID, info.startTime
+        info.FlightID = newID
+        info.CheckRide = isCheckRide
+        If isCheckRide Then
+            frmMain.chkCheckRide.value = 1
+            ShowMessage "ACARS Check Ride detected", SYSMSGCOLOR
+            PlaySoundFile "notify_newversion.wav"
+        End If
+            
+        config.SaveFlightCode SavedFlightID(info)
+        PersistFlightData True
+        SaveFlight
     ElseIf ReqID = info.PIREPReqID Then
-        info.PIREPFiled = True
-        info.FlightID = 0
-        frmMain.cmdPIREP.Visible = False
-        frmMain.cmdPIREP.Enabled = False
-        info.FlightData = False
-        MsgBox "Flight Report filed Successfully.", vbInformation + vbOKOnly
+        Set info = New FlightData
+        config.UpdateFlightInfo
+        frmMain.cmdPIREP.visible = False
+        frmMain.cmdPIREP.enabled = False
+        frmMain.progressLabel.visible = False
+        frmMain.PositionProgress.visible = False
+        MsgBox "Flight Report filed Successfully.", vbInformation + vbOKOnly, "Flight Report Filed"
     End If
 End Sub
 
@@ -178,21 +237,52 @@ Private Sub ProcessChatText(cmdNode As IXMLDOMNode)
     Dim msgFrom As String
     Dim msgTo As String
     Dim msgText As String
-
+    Dim p As Pilot
+    Dim IsSterile As Boolean
+    
+    'Check if we are in sterile cockpit mode
+    IsSterile = False
+    If ((info.FlightPhase = AIRBORNE) Or (info.FlightPhase = TAKEOFF)) Then IsSterile = (pos.AltitudeMSL < 10000)
+    
     'Get the message info
-    msgFrom = getChild(cmdNode, "from", "SYSTEM")
     msgTo = getChild(cmdNode, "to", "")
     msgText = getChild(cmdNode, "text", "")
+    msgFrom = getChild(cmdNode, "from", "SYSTEM")
+    If (msgFrom <> "SYSTEM") Then Set p = users.GetPilot(msgFrom)
+    If (Not (p Is Nothing) And config.ShowPilotNames) Then msgFrom = p.Name
 
     'Check if there is a "To" element. If so, it's a private message.
+    config.MsgReceived = True
     If (msgTo = "") Then
-        ShowMessage "<" & msgFrom & "> " & msgText, PUBLICCHATCOLOR
+        If (config.HideMessagesWhenBusy And config.Busy) Then
+            If config.ShowDebug Then ShowMessage "Ignoring chat message - Busy", DEBUGTEXTCOLOR
+        ElseIf (config.SterileCockpit And IsSterile) Then
+            If config.ShowDebug Then ShowMessage "Ignoring chat message - Sterile Cockpit", DEBUGTEXTCOLOR
+        Else
+            ShowMessage "<" & msgFrom & "> " & msgText, PUBLICCHATCOLOR
+            GAUGE_SetChat False
+            
+            'Play a sound if the option is on
+            If (config.PlaySound And (Not config.Busy) And (GetForegroundWindow <> frmMain.hwnd)) _
+                Then PlaySoundFile "notify_msg.wav"
+        End If
     Else
         ShowMessage "<" & msgFrom & ":PRIVATE> " & msgText, PRIVATECHATCOLOR
+        GAUGE_SetChat True
+        
+        'Send a response if we are busy
+        If Not (p Is Nothing) And (Left(msgText, 5) <> "AUTO:") Then
+            If config.Busy Then
+                SendChat "AUTO: I am currently busy and not available to chat.", msgFrom
+                ReqStack.Send
+            ElseIf (config.SterileCockpit And IsSterile) Then
+                SendChat "AUTO: I am in a Sterile Cockpit environment and not available to chat.", msgFrom
+                ReqStack.Send
+            ElseIf (config.PlaySound And (Not config.Busy) And (GetForegroundWindow <> frmMain.hwnd)) Then
+                PlaySoundFile "notify_msg.wav"
+            End If
+        End If
     End If
-
-    'Play a sound if the option is on.
-    If (config.PlaySound And (GetForegroundWindow <> frmMain.lngWindowHandle)) Then PlaySoundFile "notify_msg.wav"
 End Sub
 
 Private Sub ProcessDataResponse(cmdNode As IXMLDOMNode)
@@ -201,146 +291,261 @@ Private Sub ProcessDataResponse(cmdNode As IXMLDOMNode)
     
     Dim pNodes As IXMLDOMNodeList
     Dim pNode As IXMLDOMNode
-    Dim id As String
+    Dim ID As String
     Dim freq As String
     Dim Msg As String
+    
+    Dim p As Pilot
+    Dim OldDispatch As Boolean, NewDispatch As Boolean
     
     'Branch based on response type
     Set rspNodes = cmdNode.selectNodes("rsptype")
     For Each rspNode In rspNodes
         Select Case LCase(rspNode.Text)
-    
             Case "pilotlist"
-                Dim name As String
+                Dim Name As String
+                OldDispatch = users.DispatchOnline
                 
                 If config.ShowDebug Then ShowMessage "Updating Pilot List", DEBUGTEXTCOLOR
-                frmMain.lstPilots.Clear
+                users.ClearPilots
                 Set pNodes = cmdNode.selectSingleNode("pilotlist").selectNodes("Pilot")
                 For Each pNode In pNodes
-                    id = getAttr(pNode, "id", "")
-                    name = getChild(pNode, "name", id)
+                    Set p = New Pilot
+                    p.ID = getAttr(pNode, "id", "")
+                    p.FirstName = getChild(pNode, "firstname", "")
+                    p.LastName = getChild(pNode, "lastname", "")
+                    p.EquipmentType = getChild(pNode, "eqtype", "CRJ-200")
+                    p.Rank = getChild(pNode, "rank", "First Officer")
+                    p.Legs = CInt(getChild(pNode, "legs", "0"))
+                    p.Hours = CDbl(getChild(pNode, "hours", "0"))
+                    p.flightCode = getChild(pNode, "flightCode", "")
+                    p.FlightEQ = getChild(pNode, "flightEQ", "")
+                    Set p.airportD = config.GetAirport(getChild(pNode, "airportD", ""))
+                    Set p.AirportA = config.GetAirport(getChild(pNode, "airportA", ""))
+                    p.ClientBuild = CInt(getChild(pNode, "clientBuild", "60"))
+                    p.RemoteAddress = getChild(pNode, "remoteaddr", "???")
+                    p.RemoteHost = getChild(pNode, "remotehost", "???")
+                    p.IsBusy = CBool(getChild(pNode, "isBusy", "false"))
+                    p.SetRoles getChild(pNode, "roles", "Pilot")
                 
                     'Check if the ID is ours
-                    If (id <> "") Then
-                        frmMain.lstPilots.AddItem id
-                        If (UCase(id) = UCase(frmMain.txtPilotID.Text)) Then frmMain.txtPilotName.Text = name
+                    If (p.ID <> "") Then
+                        users.AddPilot p
+                        If (UCase(p.ID) = UCase(frmMain.txtPilotID.Text)) Then frmMain.txtPilotName.Text = p.Name
                     End If
                 Next
-
+                
+                'Update the pilot list
+                users.UpdatePilotList
+                
+                'If HR/Dispatch is now online, log it
+                NewDispatch = users.DispatchOnline
+                If (NewDispatch And (OldDispatch <> NewDispatch)) Then
+                    If (config.HasRole("HR") Or config.HasRole("Dispatch")) Then
+                        ShowMessage "ACARS Messaging Restrictions waived by your login", ACARSTEXTCOLOR
+                    ElseIf Not (info.InFlight Or config.IsUnrestricted) Then
+                        ShowMessage "ACARS Messaging Restrictions waived", ACARSTEXTCOLOR
+                    End If
+                End If
+                
             Case "addpilots"
+                Dim oldPilot As Pilot
+                OldDispatch = users.DispatchOnline
+            
+                'Process added pilots
                 Set pNodes = cmdNode.selectSingleNode("addpilots").selectNodes("Pilot")
                 For Each pNode In pNodes
-                    id = getAttr(pNode, "id", "")
-                    If (id <> "") Then
-                        frmMain.lstPilots.AddItem id
-                        ShowMessage getChild(pNode, "name", id) + " logged into the ACARS server.", ACARSTEXTCOLOR
+                    Set p = New Pilot
+                    p.ID = getAttr(pNode, "id", "")
+                    p.FirstName = getChild(pNode, "firstname", "")
+                    p.LastName = getChild(pNode, "lastname", "")
+                    p.EquipmentType = getChild(pNode, "eqtype", "CRJ-200")
+                    p.Rank = getChild(pNode, "rank", "First Officer")
+                    p.Legs = CInt(getChild(pNode, "legs", "0"))
+                    p.Hours = CDbl(getChild(pNode, "hours", "0"))
+                    p.flightCode = getChild(pNode, "flightCode", "")
+                    p.FlightEQ = getChild(pNode, "flightEQ", "")
+                    Set p.airportD = config.GetAirport(getChild(pNode, "airportD", ""))
+                    Set p.AirportA = config.GetAirport(getChild(pNode, "airportA", ""))
+                    p.ClientBuild = CInt(getChild(pNode, "clientBuild", "60"))
+                    p.RemoteAddress = getChild(pNode, "remoteaddr", "???")
+                    p.RemoteHost = getChild(pNode, "remotehost", "???")
+                    p.IsBusy = CBool(getChild(pNode, "isBusy", "false"))
+                    p.SetRoles getChild(pNode, "roles", "Pilot")
+
+                    'Send login message
+                    If (p.ID <> "") Then
+                        Set oldPilot = users.GetPilot(p.ID)
+                        users.AddPilot p
+                        If (oldPilot Is Nothing) Then ShowMessage p.Name + " (" + p.ID + _
+                            ") logged into the ACARS server.", ACARSTEXTCOLOR
                     End If
                 Next
-            
-            Case "delpilots"
-                Dim x As Integer
                 
+                'Update the pilot list
+                users.UpdatePilotList
+                
+                'If HR/Dispatch is now online, log it
+                NewDispatch = users.DispatchOnline
+                If (NewDispatch And (OldDispatch <> NewDispatch)) Then
+                    If (config.HasRole("HR") Or config.HasRole("Dispatch")) Then
+                        ShowMessage "ACARS Messaging Restrictions waived by your login", ACARSTEXTCOLOR
+                    ElseIf Not (info.InFlight Or config.IsUnrestricted) Then
+                        ShowMessage "ACARS Messaging Restrictions waived", ACARSTEXTCOLOR
+                    End If
+                End If
+                
+            Case "delpilots"
+                OldDispatch = users.DispatchOnline
+                
+                'Process the pilot list
                 Set pNodes = cmdNode.selectSingleNode("delpilots").selectNodes("Pilot")
                 For Each pNode In pNodes
-                    id = getAttr(pNode, "id", "")
-                    For x = 0 To frmMain.lstPilots.ListCount - 1
-                        If frmMain.lstPilots.List(x) = id Then
-                            frmMain.lstPilots.RemoveItem (x)
-                            ShowMessage getChild(pNode, "name", id) + " logged out from the ACARS server.", ACARSTEXTCOLOR
-                        End If
-                    Next
-                Next
+                    Set p = New Pilot
+                    p.ID = getAttr(pNode, "id", "")
+                    p.FirstName = getChild(pNode, "firstname", "")
+                    p.LastName = getChild(pNode, "lastname", "")
 
-        Case "pilot"
-            Dim p As IXMLDOMNode
-            
-            'Get the pilot
-            Set p = cmdNode.selectSingleNode("Pilot")
-            If (p Is Nothing) Then Exit Sub
-            
-            'Build the message
-            Msg = "Information for pilot " & getChild(p, "id", "") & ":" & vbCrLf
-            Msg = Msg & "  Name: " & getChild(p, "name", "") & vbCrLf
-            Msg = Msg & "  Time Online: " & getChild(p, "online_time", "") & vbCrLf
-            Msg = Msg & "  Flight #: " & getChild(p, "flight_num", "") & vbCrLf
-            Msg = Msg & "  Equipment: " & getChild(p, "equipment", "") & vbCrLf
-            Msg = Msg & "  Cruise  Alt: " & getChild(p, "cruise_alt", "") & vbCrLf
-            Msg = Msg & "  Departed: " & getChild(p, "dep_apt", "") & vbCrLf
-            Msg = Msg & "  Arriving at: " & getChild(p, "arr_apt", "") & vbCrLf
-            Msg = Msg & "  Route: " & getChild(p, "route", "") & vbCrLf
-            Msg = Msg & "  Remarks: " & getChild(p, "remarks", "") & vbCrLf
-            Msg = Msg & "  Alt MSL: " & getChild(p, "alt_msl", "") & vbCrLf
-            Msg = Msg & "  Heading: " & getChild(p, "heading", "") & vbCrLf
-            Msg = Msg & "  Air Speed: " & getChild(p, "air_speed", "") & vbCrLf
-            Msg = Msg & "  Ground Speed: " & getChild(p, "ground_speed", "") & vbCrLf
-            Msg = Msg & "  Flight Phase: " & getChild(p, "phase", "") & vbCrLf
-            ShowMessage Msg, SYSMSGCOLOR
-            
-        Case "runways"
-            Set pNode = cmdNode.selectSingleNode("runways")
-            If (pNode Is Nothing) Then Exit Sub
-            Set pNode = pNode.selectSingleNode("runway")
-            If (pNode Is Nothing) Then Exit Sub
-            
-            'Display runway info
-            freq = getChild(pNode, "freq", "")
-            Msg = "Runway " + getAttr(pNode, "name", "?") + " at " + getAttr(pNode, "icao", "?") + _
-                ": " + Format(CInt(getAttr(pNode, "length", "0")), "##,##0") + " feet, " + _
-                Format(CInt(getAttr(pNode, "hdg", "0")), "000") + " degrees"
-            If (freq <> "") Then Msg = Msg + " ILS: " + freq
-            ShowMessage Msg, SYSMSGCOLOR
-            
-            'If we have a frequency, update the NAV1 radio
-            If (freq <> "") Then
-                setNAV1 freq, CInt(getAttr(pNode, "hdg", ""))
-                ShowMessage "NAV1 Radio set to " + freq, ACARSTEXTCOLOR
-            End If
-            
-        Case "navaid"
-            'Get the navaid info
-            Set pNode = cmdNode.selectSingleNode("navaid")
-            If (pNode Is Nothing) Then Exit Sub
-            Set pNode = pNode.selectSingleNode("navaid")
-            If (pNode Is Nothing) Then Exit Sub
-            
-            'Set stuff based on navaid type
-            freq = getChild(pNode, "freq", "")
-            Select Case getChild(pNode, "radio", "")
-                Case "nav1"
-                    setNAV1 freq, CInt(getChild(pNode, "hdg", ""))
-                    ShowMessage "NAV1 Radio set to " + freq, ACARSTEXTCOLOR
-                    
-                Case "nav2"
-                    SetNAV2 freq
-                    ShowMessage "NAV2 Radio set to " + freq, ACARSTEXTCOLOR
-            End Select
-            
-        Case "airports"
-            'Load the Airport Names/Codes
-            Set pNode = cmdNode.selectSingleNode("airports")
-            If Not (pNode Is Nothing) Then
-                Set pNodes = pNode.selectNodes("airport")
-                config.ClearAirports
-                For Each pNode In pNodes
-                    id = UCase(getAttr(pNode, "icao"))
-                    config.AddAirport getAttr(pNode, "name") + " (" + id + ")", id
+                    users.DeletePilot p.ID
+                    ShowMessage p.Name + " (" + p.ID + ") logged out from the ACARS server.", ACARSTEXTCOLOR
                 Next
                 
-                SetComboChoices frmMain.cboAirportD, config.AirportNames
-                SetComboChoices frmMain.cboAirportA, config.AirportNames
-                If config.ShowDebug Then ShowMessage "Updated Airport List, size=" + CStr(UBound(config.AirportNames) + 1), DEBUGTEXTCOLOR
-                config.SaveAirports
-            End If
+                'Update the Pilot List
+                users.UpdatePilotList
+                
+                'If HR/Dispatch is now offline, log it
+                NewDispatch = users.DispatchOnline
+                If (Not NewDispatch And (OldDispatch <> NewDispatch)) Then
+                    If Not (info.InFlight Or config.IsUnrestricted) Then
+                        ShowMessage "ACARS Messaging Restrictions restored", ACARSTEXTCOLOR
+                    End If
+                End If
+                
+            Case "atc"
+                Dim ctr As Controller
+                
+                If config.ShowDebug Then ShowMessage "Updating ATC List", DEBUGTEXTCOLOR
+                Set pNodes = cmdNode.selectSingleNode("atc").selectNodes("ctr")
+                users.ClearATC
+                For Each pNode In pNodes
+                    Set ctr = New Controller
+                    ctr.ID = getAttr(pNode, "code", "?")
+                    ctr.NetworkID = getAttr(pNode, "networkID", "000000")
+                    ctr.Frequency = getAttr(pNode, "freq", "199.98")
+                    ctr.Name = getAttr(pNode, "name", "???")
+                    ctr.Rating = getAttr(pNode, "rating", "Observer")
+                    ctr.FacilityType = getAttr(pNode, "type", "Center")
+                    
+                    'Add to the list
+                    users.AddController ctr
+                Next
+                
+                'Update the ATC list
+                users.UpdateATCList
+                If Not frmMain.SSTab1.TabEnabled(2) Then
+                    frmMain.SSTab1.TabCaption(2) = info.Network + " Air Traffic Control"
+                    frmMain.SSTab1.TabEnabled(2) = True
+                    frmMain.SSTab1.TabVisible(2) = True
+                End If
+            
+            Case "runways"
+                Set pNode = cmdNode.selectSingleNode("runways")
+                If (pNode Is Nothing) Then Exit Sub
+                Set pNode = pNode.selectSingleNode("runway")
+                If (pNode Is Nothing) Then Exit Sub
+            
+                'Display runway info
+                freq = getChild(pNode, "freq", "")
+                Msg = "Runway " + getAttr(pNode, "name", "?") + " at " + getAttr(pNode, "icao", "?") + _
+                    ": " + Format(CInt(getAttr(pNode, "length", "0")), "##,##0") + " feet, " + _
+                    Format(CInt(getAttr(pNode, "hdg", "0")), "000") + " degrees"
+                If (freq <> "") Then Msg = Msg + " ILS: " + freq
+                ShowMessage Msg, SYSMSGCOLOR
+            
+                'If we have a frequency, update the NAV1 radio
+                If (freq <> "") Then
+                    setNAV1 freq, CInt(getAttr(pNode, "hdg", ""))
+                    ShowMessage "NAV1 Radio set to " + freq, ACARSTEXTCOLOR
+                End If
+            
+            Case "navaid"
+                'Get the navaid info
+                Set pNode = cmdNode.selectSingleNode("navaid")
+                If (pNode Is Nothing) Then Exit Sub
+                Set pNode = pNode.selectSingleNode("navaid")
+                If (pNode Is Nothing) Then Exit Sub
+            
+                'Set stuff based on navaid type
+                freq = getChild(pNode, "freq", "")
+                Select Case getChild(pNode, "radio", "")
+                    Case "nav1"
+                        setNAV1 freq, CInt(getChild(pNode, "hdg", ""))
+                        ShowMessage "NAV1 Radio set to " + freq, ACARSTEXTCOLOR
+                    
+                    Case "nav2"
+                        SetNAV2 freq
+                        ShowMessage "NAV2 Radio set to " + freq, ACARSTEXTCOLOR
+                End Select
+            
+            Case "airports"
+                Dim a As Airport
+            
+                'Load the Airport Names/Codes
+                Set pNode = cmdNode.selectSingleNode("airports")
+                If Not (pNode Is Nothing) Then
+                    Set pNodes = pNode.selectNodes("airport")
+                    config.ClearAirports
+                    For Each pNode In pNodes
+                        Set a = New Airport
+                        a.ICAO = getAttr(pNode, "icao")
+                        a.IATA = getAttr(pNode, "iata")
+                        a.Name = Replace(getAttr(pNode, "name", a.ICAO), ",", "")
+                        a.Latitude = CDbl(Replace(getAttr(pNode, "lat", "0"), ".", config.DecimalSeparator))
+                        a.Longitude = CDbl(Replace(getAttr(pNode, "lng", "0"), ".", config.DecimalSeparator))
+                        config.AddAirport a
+                    Next
+                
+                    SetComboChoices frmMain.cboAirportD, config.AirportNames, "", "-"
+                    SetComboChoices frmMain.cboAirportA, config.AirportNames, "", "-"
+                    If config.ShowDebug Then ShowMessage "Updated Airport List, size=" + CStr(UBound(config.AirportNames) + 1), DEBUGTEXTCOLOR
+                    config.SaveAirports
+                End If
+
+            Case "pireps"
+                Dim fr As FlightReport
+            
+                Set pNode = cmdNode.selectSingleNode("pireps")
+                If (pNode Is Nothing) Then Exit Sub
+                
+                Load frmDraftPIREP
+                Set pNodes = pNode.selectNodes("pirep")
+                For Each pNode In pNodes
+                    Set fr = New FlightReport
+                    fr.flightCode = getAttr(pNode, "airline", "") + getAttr(pNode, "number", "001")
+                    fr.Leg = CInt(getAttr(pNode, "leg", "1"))
+                    fr.EquipmentType = getChild(pNode, "eqType", "")
+                    Set fr.airportD = config.GetAirport(getChild(pNode, "airportD", ""))
+                    Set fr.AirportA = config.GetAirport(getChild(pNode, "airportA", ""))
+                    fr.Remarks = getChild(pNode, "remarks", "")
+                    
+                    'Add to the list
+                    frmDraftPIREP.AddFlight fr
+                Next
+                
+                If (frmDraftPIREP.Size > 0) Then
+                    frmDraftPIREP.Update
+                    frmDraftPIREP.Show
+                End If
 
         Case "info"
             'Load the equipment types
             Set pNode = cmdNode.selectSingleNode("info")
             If Not (pNode Is Nothing) Then
                 'Get the private voice URL
-                id = getChild(pNode, "url", "")
-                If (id <> "") Then
-                    config.PrivateVoiceURL = id
-                    If config.ShowDebug Then ShowMessage "Private Voice URL = " + id, DEBUGTEXTCOLOR
+                ID = getChild(pNode, "url", "")
+                If (ID <> "") Then
+                    config.PrivateVoiceURL = ID
+                    If config.ShowDebug Then ShowMessage "Private Voice URL = " + ID, DEBUGTEXTCOLOR
                 End If
             
                 'Get the equipment types
@@ -352,7 +557,7 @@ Private Sub ProcessDataResponse(cmdNode As IXMLDOMNode)
                     Next
                 
                     If config.ShowDebug Then ShowMessage "Updating Equipment List", DEBUGTEXTCOLOR
-                    SetComboChoices frmMain.cboEquipment, config.EquipmentTypes
+                    SetComboChoices frmMain.cboEquipment, config.EquipmentTypes, info.EquipmentType, "-"
                     config.SaveEquipment
                 End If
             End If

@@ -15,18 +15,22 @@ Option Explicit
 
 'Flight information
 Public FlightID As Long
+Public CheckRide As Boolean
 
 Public EquipmentType As String
 Public FlightNumber As String
+Public FlightLeg As Integer
 Public CruiseAltitude As String
-Public AirportA As String
-Public AirportD As String
-Public AirportL As String
+Public AirportA As Airport
+Public airportD As Airport
+Public AirportL As Airport
 Public Route As String
 Public Remarks As String
 Public Network As String
 
-Public Phase As String
+Public FlightPhase As Integer
+Private PhaseNames As Variant
+
 Public FSVersion As Integer
 Public Offline As Boolean
 
@@ -41,22 +45,20 @@ Private Info_ReqID As Long
 Private PIREP_ReqID As Long
 
 'Flight Start Data
-Public startTime As Date
-Public TimeOut As Date
-Public TaxiOutTime As Date
+Public StartTime As New UTCDate
+Public TaxiOutTime As New UTCDate
 Public TaxiFuel As Long
 Public TaxiWeight As Long
 
 'Takeoff data
-Public TimeOff As Date
-Public TakeoffTime As Date
+Public TakeoffTime As New UTCDate
 Public TakeoffSpeed As Integer
 Public TakeoffFuel As Long
 Public TakeoffWeight As Long
 Public TakeoffN1 As Double
 
 'Landing Data
-Public LandingTime As Date
+Public LandingTime As New UTCDate
 Public LandingSpeed As Integer
 Public LandingVSpeed As Integer
 Public LandingFuel As Long
@@ -64,11 +66,11 @@ Public LandingWeight As Long
 Public LandingN1 As Double
 
 'Flight end data
-Public TaxiInTime As Date
-Public GateTime As Date
+Public TaxiInTime As New UTCDate
+Public GateTime As New UTCDate
 Public GateFuel As Long
 Public GateWeight As Long
-Public ShutdownTime As Date
+Public ShutdownTime As New UTCDate
 Public ShutdownFuel As Long
 Public ShutdownWeight As Long
 
@@ -78,21 +80,34 @@ Public FlightData As Boolean
 Public PIREPFiled As Boolean
 
 Sub Class_Initialize()
-    Phase = "N/A"
+    PhaseNames = Array("N/A", "Pre-Flight", "Pushback", "Taxi Out", "Takeoff", "Airborne", _
+        "Landed", "Taxi In", "At Gate", "Shutdown", "Complete", "Aborted", "Error")
+    Network = "Offline"
+    FlightPhase = UNKNOWN
+    InFlight = False
+    FlightData = False
+    PIREPFiled = False
+    Offline = False
 End Sub
 
 'Start a new flight
-Sub StartFlight()
+Sub StartFlight(Optional isOnline As Boolean = True)
     InFlight = True
     FlightData = False
     PIREPFiled = False
-    Phase = "Preflight"
-    startTime = Now
+    Offline = Not isOnline
+    FlightPhase = PREFLIGHT
+    If (Year(StartTime.LocalTime) < 2004) Then StartTime.LocalTime = Now
 End Sub
 
+Property Get PhaseName() As String
+    If ((FlightPhase < 0) Or (FlightPhase > UBound(PhaseNames))) Then FlightPhase = 0
+    PhaseName = PhaseNames(FlightPhase)
+End Property
+
 'Updates flight time
-Sub UpdateFlightTime(ByVal simRate As Integer, ByVal interval As Integer)
-    If info.Phase <> "Airborne" Then Exit Sub
+Function UpdateFlightTime(ByVal simRate As Integer, ByVal interval As Integer) As Date
+    Dim tmpS As Integer
 
     interval = interval * simRate
     Select Case (simRate)
@@ -103,18 +118,38 @@ Sub UpdateFlightTime(ByVal simRate As Integer, ByVal interval As Integer)
         Case 4
             Time4X = Time4X + interval
     End Select
-End Sub
+    
+    'Return a time value
+    tmpS = FlightTime Mod 3600
+    UpdateFlightTime = TimeSerial(Fix(FlightTime / 3600), Fix(tmpS / 60), tmpS Mod 60)
+End Function
 
-Property Get TimeAt1X() As Integer
-    TimeAt1X = Time1X / 60000
+Property Get TimeAt1X() As Long
+    TimeAt1X = Time1X / 1000
 End Property
 
-Property Get TimeAt2X() As Integer
-    TimeAt2X = Time2X / 60000
+Property Let TimeAt1X(ByVal ms As Long)
+    Time1X = ms * 1000
 End Property
 
-Property Get TimeAt4X() As Integer
-    TimeAt4X = Time4X / 60000
+Property Get TimeAt2X() As Long
+    TimeAt2X = Time2X / 1000
+End Property
+
+Property Let TimeAt2X(ByVal ms As Long)
+    Time2X = ms * 1000
+End Property
+
+Property Get TimeAt4X() As Long
+    TimeAt4X = Time4X / 1000
+End Property
+
+Property Let TimeAt4X(ByVal ms As Long)
+    Time4X = ms * 1000
+End Property
+
+Property Get FlightTime() As Long
+    FlightTime = CLng(Time1X + Time2X + Time4X) / 1000
 End Property
 
 Property Get AuthReqID() As Long

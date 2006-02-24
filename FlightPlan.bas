@@ -6,15 +6,17 @@ Private Const FS9Filter = "FS2004 Flight Plans (*.pln)|*.pln"
 
 Public Sub FPlan_Open()
     Dim planFileName As String
+    Dim lats As Variant
+    Dim lngs As Variant
     
     If config.SB3Support Then
-        frmMain.CommonDialog1.Filter = SB3Filter + "|" + FS9Filter
+        frmMain.CommonDialog1.Filter = FS9Filter + "|" + SB3Filter
     Else
         frmMain.CommonDialog1.Filter = FS9Filter
     End If
 
     frmMain.CommonDialog1.CancelError = True
-    frmMain.CommonDialog1.DialogTitle = "Open Squawkbox 3 Flight Plan"
+    frmMain.CommonDialog1.DialogTitle = "Open Flight Plan"
     frmMain.CommonDialog1.flags = cdlOFNFileMustExist + cdlOFNHideReadOnly
     
     'Display the dialog box
@@ -29,32 +31,62 @@ Public Sub FPlan_Open()
     'Update the fields
     Select Case LCase(Right(planFileName, 3))
         Case "sfp"
-            info.AirportD = ReadINI("SBFlightPlan", "Departure", info.AirportD, planFileName)
-            info.AirportA = ReadINI("SBFlightPlan", "Arrival", info.AirportA, planFileName)
-            info.AirportL = ReadINI("SBFlightPlan", "Alternate", info.AirportL, planFileName)
+            Set info.AirportD = config.GetAirport(ReadINI("SBFlightPlan", "Departure", "", planFileName))
+            Set info.AirportA = config.GetAirport(ReadINI("SBFlightPlan", "Arrival", "", planFileName))
+            Set info.AirportL = config.GetAirport(ReadINI("SBFlightPlan", "Alternate", "", planFileName))
             info.CruiseAltitude = ReadINI("SBFlightPlan", "Altitude", info.CruiseAltitude, planFileName)
             info.Route = ReadINI("SBFlightPlan", "Route", info.Route, planFileName)
             info.Remarks = ReadINI("SBFlightPlan", "Remarks", info.Remarks, planFileName)
             
         Case "pln"
             Dim depInfo As String
+            Dim depData As Variant
             Dim destInfo As String
             Dim tmpRoute As String
             Dim x As Integer
             
+            'Initialize the data arrays
+            ReDim lats(25)
+            ReDim lngs(25)
+            
             info.CruiseAltitude = ReadINI("flightplan", "cruising_altitude", info.CruiseAltitude, planFileName)
             depInfo = ReadINI("flightplan", "departure_id", "KATL", planFileName)
             destInfo = ReadINI("flightplan", "destination_id", "KATL", planFileName)
-            info.AirportD = UCase(Trim(Split(depInfo, ",")(0)))
-            info.AirportA = UCase(Trim(Split(destInfo, ",")(0)))
+            Set info.AirportD = config.GetAirport(UCase(Trim(Split(depInfo, ",")(0))))
+            Set info.AirportA = config.GetAirport(UCase(Trim(Split(destInfo, ",")(0))))
             
             While (depInfo <> "X")
                 depInfo = ReadINI("flightplan", "waypoint." + CStr(x), "X", planFileName)
-                If (depInfo <> "X") Then tmpRoute = tmpRoute + " " + UCase(Trim(Split(depInfo, ",")(1)))
+                If (depInfo <> "X") Then
+                    depData = Split(UCase(depInfo), ",")
+                    tmpRoute = tmpRoute + " " + Trim(depData(3))
+                    If (x < 25) Then
+                        lats(x) = ConvertLatLon(depData(5))
+                        lngs(x) = ConvertLatLon(depData(6))
+                    End If
+                End If
+                
                 x = x + 1
             Wend
             
-            info.Route = Trim(tmpRoute)
+            'Save the route
+            info.Route = UCase(Trim(tmpRoute))
+            
+            'If we're using a 707, offer to write the flight plan
+            If (Left(info.EquipmentType, 4) = "B707") Then
+                If (MsgBox("Do you want to save this as a Boeing 707 INS flight plan?", _
+                    vbYesNo + vbQuestion, "707 INS Flight Plan") = vbYes) Then
+                        If (x < 25) Then
+                            ReDim Preserve lats(x - 1)
+                            ReDim Preserve lngs(x - 1)
+                        Else
+                            ShowMessage "Flight Plan truncated. INS plans have a maximum of 25 waypoints.", ACARSERRORCOLOR
+                        End If
+                        
+                        'Save the flight plan
+                        SaveINSPlan lats, lngs
+                End If
+            End If
     End Select
     
     config.UpdateFlightInfo
@@ -62,28 +94,42 @@ End Sub
 
 Public Sub SB3Plan_Save()
     Dim planFileName As String
+    
+    On Error GoTo FatalError
+    
+    'Get the path
+    frmMain.CommonDialog1.FileName = frmMain.CommonDialog1.InitDir + info.AirportD.ICAO + "-" + info.AirportA.ICAO + ".sfp"
 
+    'Set dialog options
     frmMain.CommonDialog1.CancelError = True
     frmMain.CommonDialog1.DialogTitle = "Save Squawkbox 3 Flight Plan"
     frmMain.CommonDialog1.Filter = "Squawkbox 3 Flight Plans (*.sfp)|*.sfp"
     frmMain.CommonDialog1.flags = cdlOFNHideReadOnly
-
+    
     'Display the dialog box
     On Error Resume Next
     frmMain.CommonDialog1.ShowSave
     If err Then Exit Sub
-    On Error GoTo 0
+    On Error GoTo FatalError
     
     'Get the file name
     planFileName = frmMain.CommonDialog1.FileName
 
     'Write the INI file
-    WriteINI "SBFlightPlan", "Departure", info.AirportD, planFileName
-    WriteINI "SBFlightPlan", "Arrival", info.AirportA, planFileName
-    WriteINI "SBFlightPlan", "Alternate", info.AirportL, planFileName
+    If Not (info.AirportD Is Nothing) Then WriteINI "SBFlightPlan", "Departure", info.AirportD.ICAO, planFileName
+    If Not (info.AirportA Is Nothing) Then WriteINI "SBFlightPlan", "Arrival", info.AirportA.ICAO, planFileName
+    If Not (info.AirportL Is Nothing) Then WriteINI "SBFlightPlan", "Alternate", info.AirportL.ICAO, planFileName
     WriteINI "SBFlightPlan", "Altitude", info.CruiseAltitude, planFileName
     WriteINI "SBFlightPlan", "Route", info.Route, planFileName
     WriteINI "SBFlightPlan", "Remarks", info.Remarks, planFileName
+    
+ExitSub:
+    Exit Sub
+    
+FatalError:
+    MsgBox "Error saving SquawkBox 3 Flight Plan", vbCritical, err.Description
+    Resume ExitSub
+    
 End Sub
 
 Public Function SB3InstallCheck() As Boolean
@@ -148,4 +194,57 @@ Public Sub SB3PrivateVoice(ByVal url As String)
     End If
     
     ShowMessage "SB3 Private Voice channel set to " + url, ACARSTEXTCOLOR
+End Sub
+
+Private Function ConvertLatLon(ByVal info As String) As Double
+    Dim degParts As Variant
+    Dim degrees As Double
+    Dim hemi As String
+    
+    'Remove leading space and split string
+    degParts = Split(Mid(info, 2), "* ")
+    
+    'Get the hemisphere
+    hemi = UCase(Left(degParts(0), 1))
+    
+    'Calculate degrees and minutes
+    degrees = Int(Val(Mid(degParts(0), 2)))
+    degrees = degrees + (Val(Left(degParts(1), Len(degParts(1)) - 1)) / 60)
+    If ((hemi = "S") Or (hemi = "W")) Then degrees = degrees * -1
+    
+    'Combine and return
+    ConvertLatLon = degrees
+End Function
+
+Private Sub SaveINSPlan(lats As Variant, lngs As Variant)
+    Dim x As Integer
+    Dim fNum As Integer
+
+    With frmMain.CommonDialog1
+        .CancelError = True
+        .DialogTitle = "Save B707 INS Flight Plan"
+        .Filter = "B707 INS Flight Plans (707fplan?.dat)|707fplan?.dat"
+        .flags = cdlOFNHideReadOnly
+        .FileName = "707fplan0.dat"
+    End With
+
+    'Display the dialog box
+    On Error Resume Next
+    frmMain.CommonDialog1.ShowSave
+    If err Then Exit Sub
+    On Error GoTo 0
+    
+    'Write to the file
+    fNum = FreeFile()
+    Open frmMain.CommonDialog1.FileName For Output Lock Write As #fNum
+    For x = 0 To UBound(lats)
+        Print #fNum, Format(lats(x), "#0.000000")
+        If (lngs(x) < 0) Then
+            Print #fNum, Format(lngs(x) + 360, "##0.000000")
+        Else
+            Print #fNum, Format(lngs(x), "##0.000000")
+        End If
+    Next
+    
+    Close #fNum
 End Sub

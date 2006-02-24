@@ -27,6 +27,16 @@ Begin VB.Form frmSplash
    ScaleWidth      =   9000
    ShowInTaskbar   =   0   'False
    StartUpPosition =   2  'CenterScreen
+   Begin VB.Label lblProgress 
+      BackStyle       =   0  'Transparent
+      Caption         =   "Initializing something or other..."
+      ForeColor       =   &H00FFFFC0&
+      Height          =   255
+      Left            =   120
+      TabIndex        =   1
+      Top             =   6360
+      Width           =   3255
+   End
    Begin VB.Label VersionLabel 
       Alignment       =   1  'Right Justify
       BackStyle       =   0  'Transparent
@@ -65,6 +75,17 @@ End Sub
 
 Private Sub Form_Load()
     VersionLabel.Caption = "Version " + CStr(App.Major) + "." + CStr(App.Minor) + _
-        " (Build " + Format(App.Revision, "000") + ") Release Candidate 1"
+        " (Build " + Format(App.Revision, "000") + ")"
+End Sub
+
+Public Sub SetProgressLabel(ProgressInfo As String)
+    lblProgress.Caption = ProgressInfo + " ..."
+    DoEvents
+    Sleep 150
+End Sub
+
+Public Sub ClearProgressLabel()
+    lblProgress.Caption = ""
+    DoEvents
 End Sub
 
