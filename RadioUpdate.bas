@@ -5,11 +5,16 @@ Private Const comRadioReset = 1
 Private Const navRadioReset = 2
 
 Private Function convertNAVCOM(ByVal freq As String) As Integer
-
     'returns 110.15 as 0x1015
     Dim freqTop As Integer
     Dim freqBottom As Integer
     Dim retVal As Integer
+    
+    'Check for empty string
+    If (freq = "") Then
+        convertNAVCOM = -1
+        Exit Function
+    End If
     
     'Split the frequency
     freqTop = Fix(CDbl(freq))
@@ -25,12 +30,17 @@ Private Function convertNAVCOM(ByVal freq As String) As Integer
 End Function
 
 Private Function convertADF(ByVal freq As String) As Long
-
     'returns 343.5 as 0x00050343
     Dim freqTop As Integer
     Dim freqBottom As Integer
     Dim retTop As Integer
     Dim retBottom As Integer
+    
+    'Check for empty string
+    If (freq = "") Then
+        convertADF = -1
+        Exit Function
+    End If
     
     'Split the frequency
     freqTop = Fix(CDbl(freq))
@@ -52,6 +62,7 @@ Public Sub setNAV1(freqStr As String, hdg As Integer)
 
     'Write the frequency/heading
     freq = convertNAVCOM(freqStr)
+    If (freq = -1) Then Exit Sub
     Call FSUIPC_Write(&H350, 2, VarPtr(freq), lngResult)
     Call FSUIPC_Write(&HC4E, 2, VarPtr(hdg), lngResult)
     
@@ -66,6 +77,7 @@ Public Sub SetNAV2(freqStr As String)
 
     'Write the frequency
     freq = convertNAVCOM(freqStr)
+    If (freq = -1) Then Exit Sub
     Call FSUIPC_Write(&H352, 2, VarPtr(freq), lngResult)
                         
     'Tell FS that the NAV freq changesd
@@ -79,6 +91,7 @@ Public Sub SetCOM1(freqStr As String)
 
     'Write the frequency
     freq = convertNAVCOM(freqStr)
+    If (freq = -1) Then Exit Sub
     Call FSUIPC_Write(&H34E, 2, VarPtr(freq), lngResult)
     Call FSUIPC_Write(&H38A, 1, VarPtr(comRadioReset), lngResult)
     If Not FSUIPC_Process(lngResult) Then ShowMessage "Error setting COM1", ACARSERRORCOLOR
@@ -90,6 +103,7 @@ Public Sub SetCOM2(freqStr As String)
 
     'Write the frequency
     freq = convertNAVCOM(freqStr)
+    If (freq = -1) Then Exit Sub
     Call FSUIPC_Write(&H3118, 2, VarPtr(freq), lngResult)
     Call FSUIPC_Write(&H38A, 1, VarPtr(comRadioReset), lngResult)
     If Not FSUIPC_Process(lngResult) Then ShowMessage "Error setting COM2", ACARSERRORCOLOR
@@ -101,4 +115,5 @@ Public Sub setADF1(freqStr As String)
     
     'Write the frequency
     freq = convertADF(freqStr)
+    If (freq = -1) Then Exit Sub
 End Sub

@@ -3,12 +3,11 @@ Begin VB.Form frmSplash
    Appearance      =   0  'Flat
    BackColor       =   &H80000005&
    BorderStyle     =   0  'None
-   Caption         =   "Form1"
+   Caption         =   "Splash Screen"
    ClientHeight    =   6750
    ClientLeft      =   0
    ClientTop       =   0
    ClientWidth     =   9000
-   ControlBox      =   0   'False
    BeginProperty Font 
       Name            =   "Tahoma"
       Size            =   8.25
@@ -18,15 +17,27 @@ Begin VB.Form frmSplash
       Italic          =   0   'False
       Strikethrough   =   0   'False
    EndProperty
+   HasDC           =   0   'False
    Icon            =   "frmSplash.frx":0000
    LinkTopic       =   "Form1"
    MaxButton       =   0   'False
    MinButton       =   0   'False
+   NegotiateMenus  =   0   'False
    Picture         =   "frmSplash.frx":08CA
    ScaleHeight     =   6750
    ScaleWidth      =   9000
    ShowInTaskbar   =   0   'False
    StartUpPosition =   2  'CenterScreen
+   Begin VB.Label lblProgress 
+      BackStyle       =   0  'Transparent
+      Caption         =   "Initializing something or other..."
+      ForeColor       =   &H00FFFFC0&
+      Height          =   255
+      Left            =   120
+      TabIndex        =   1
+      Top             =   6480
+      Width           =   3495
+   End
    Begin VB.Label VersionLabel 
       Alignment       =   1  'Right Justify
       BackStyle       =   0  'Transparent
@@ -53,6 +64,8 @@ Attribute VB_GlobalNameSpace = False
 Attribute VB_Creatable = False
 Attribute VB_PredeclaredId = True
 Attribute VB_Exposed = False
+Option Explicit
+
 Public isClicked As Boolean
 
 Private Sub Form_Click()
@@ -68,3 +81,13 @@ Private Sub Form_Load()
         " (Build " + Format(App.Revision, "000") + ")"
 End Sub
 
+Public Sub SetProgressLabel(ProgressInfo As String)
+    lblProgress.Caption = ProgressInfo + " ..."
+    DoEvents
+    Sleep 150
+End Sub
+
+Public Sub ClearProgressLabel()
+    lblProgress.Caption = ""
+    DoEvents
+End Sub

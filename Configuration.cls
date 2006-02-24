@@ -16,13 +16,14 @@ Option Explicit
 'Registry settings key
 Private Const REG_ROOT_KEY = "SOFTWARE\Delta Virtual Airlines"
 Private Const REG_SETTINGS_KEY = "SOFTWARE\Delta Virtual Airlines\ACARS"
+Private Const INT_FORMAT_KEY = "Control Panel\International"
 
 'Airport configuration file
 Private Const AIRPORT_DATA = "airports.cfg"
 Private Const EQ_DATA = "eqTypes.cfg"
 
 'Server connection constants.
-Private Const DEFAULT_ACARS_HOST = "golgotha.deltava.org"
+Private Const DEFAULT_ACARS_HOST = "acars.deltava.org"
 Private Const DEFAULT_ACARS_PORT = 15527
 Private Const DEFAULT_POS_INTERVAL = 30
 Private Const DEFAULT_PING_INTERVAL = 45
@@ -32,13 +33,17 @@ Private ACARS_Host As String
 Private ACARS_Port As Integer
 
 Private eqTypes As Variant
-Private aNames As Variant
-Private aCodes As Variant
+Private airportInfo As Variant
 
 'Flight state data
 Public FSUIPCConnected As Boolean
 Public ACARSConnected As Boolean
 Public SeenHELO As Boolean
+
+'Decimal/date/time separators
+Public DecimalSeparator As String
+Public DateSeparator As String
+Public TimeSeparator As String
 
 'Menu options
 Public FlyOffline As Boolean
@@ -46,43 +51,69 @@ Public PlaySound As Boolean
 Public SavePassword As Boolean
 Public ShowTimestamps As Boolean
 Public ShowDebug As Boolean
+Public ShowPilotNames As Boolean
+Public HideWhenMinimized As Boolean
+Public HideMessagesWhenBusy As Boolean
+Public SterileCockpit As Boolean
+Public GaugeSupport As Boolean
+Public FreezeWindow As Boolean
+
+'Security roles
+Private Roles As Variant
+Public IsUnrestricted As Boolean
+Public NoMessages As Boolean
 
 'Update intervals
 Public PingInterval As Integer
 Public PositionInterval As Integer
+
+'WideFS support - this overrides SB3/IVAp installation checks
+Public WideFSInstalled As Boolean
 
 'SB3 Support info
 Public SB3Support As Boolean
 Public SB3Installed As Boolean
 Public SB3Connected As Boolean
 
-'IVAp Support info
-Public IVAPSupport As Boolean
-Public IVAPInstalled As Boolean
-Public IVAPConnected As Boolean
+'TeamSpeak support info
+Public TS2Support As Boolean
 
 Public PrivateVoiceURL As String
+Public MsgReceived As Boolean
+Public Busy As Boolean
+
+Private FS9Data As String
+Private ForceCfgUpdate As Boolean
+
+'Win32 API constants for user shell folders
+Private Const CSIDL_MYDOCUMENTS = &H5&
+Private Const CSIDL_APPDATA = &H1A&
+Private Const CSIDL_LOCAL_APPDATA = &H1C&
+
+'Win32 API functions to get My Docs folder
+'Private Declare Function lstrlenW Lib "kernel32" (ByVal lpString As Long) As Long
+Private Declare Function SHGetFolderPath Lib "shfolder.dll" Alias "SHGetFolderPathA" _
+  (ByVal hWnd As Long, ByVal nFolder As Long, ByVal hToken As Long, ByVal dwReserved As Long, _
+  ByVal lpszPath As String) As Long
 
 Public Sub Class_Initialize()
-    eqTypes = Array("A310", "A318", "A319", "A320", "A321", "A330", "A340", "ATR-72", "B707-320", "B727-200", "B737-200", "B737-300", "B737-800", "B747-100", "B747-200", "B747-400", "B757-200", "B767-200", "B767-300", "B767-400", "B777-200", "B777-300", "Caravelle", "Comet", "Concorde", "Constellation", "CRJ-200", "CRJ-700", "CV-880", "DC-10-10", "DC-3", "DC-6", "DC-8-11", "DC-8-33", "DC-8-51", "DC-8-61", "DC-8-71", "DC-9-14", "DC-9-32", "DO-328", "EMB-120", "ERJ-135", "ERJ-145", "L-1011", "MD-11", "MD-88", "MD-90")
-    aNames = Array()
-    aCodes = Array()
+    'Load the decimal/date separator
+    DecimalSeparator = RegReadString(HKEY_CURRENT_USER, INT_FORMAT_KEY, "sDecimal", ".")
+    DateSeparator = RegReadString(HKEY_CURRENT_USER, INT_FORMAT_KEY, "sDate", "/")
+    TimeSeparator = RegReadString(HKEY_CURRENT_USER, INT_FORMAT_KEY, "sTime", ":")
+
+    eqTypes = Array("A310", "A318", "A319", "A320", "A321", "A330-200", "A340-300", "ATR-72", "B707-320", "B727-200", "B737-200", "B737-300", "B737-800", "B747-100", "B747-200", "B747-400", "B757-200", "B767-200", "B767-300", "B767-400", "B777-200", "B777-300", "Caravelle", "Comet", "Concorde", "Constellation", "CRJ-200", "CRJ-700", "CV-880", "DC-10-10", "DC-3", "DC-6", "DC-8-11", "DC-8-33", "DC-8-51", "DC-8-61", "DC-8-71", "DC-9-14", "DC-9-32", "DO-328", "EMB-120", "ERJ-135", "ERJ-145", "L-1011", "MD-11", "MD-88", "MD-90")
+    airportInfo = Array()
+    Roles = Array()
 
     'Load Global Settings
     ACARS_Host = RegReadString(HKEY_LOCAL_MACHINE, REG_SETTINGS_KEY, "ACARSServerHost", DEFAULT_ACARS_HOST)
     ACARS_Port = RegReadDWORD(HKEY_LOCAL_MACHINE, REG_SETTINGS_KEY, "ACARSServerPort", DEFAULT_ACARS_PORT)
+    SeenHELO = False
 
     'Load Local Settings
     frmMain.txtPilotID.Text = RegReadString(HKEY_CURRENT_USER, REG_SETTINGS_KEY, "Pilot ID", "")
     frmMain.txtPassword.Text = RegReadString(HKEY_CURRENT_USER, REG_SETTINGS_KEY, "Password", "")
-    frmMain.txtFlightNumber.Text = RegReadString(HKEY_CURRENT_USER, REG_SETTINGS_KEY, "FlightNumber", "")
-    info.EquipmentType = RegReadString(HKEY_CURRENT_USER, REG_SETTINGS_KEY, "Equipment", "")
-    info.CruiseAltitude = RegReadString(HKEY_CURRENT_USER, REG_SETTINGS_KEY, "Altitude", "")
-    info.Route = RegReadString(HKEY_CURRENT_USER, REG_SETTINGS_KEY, "Route", "")
-    info.Remarks = RegReadString(HKEY_CURRENT_USER, REG_SETTINGS_KEY, "Remarks", "")
-    info.AirportD = RegReadString(HKEY_CURRENT_USER, REG_SETTINGS_KEY, "AirportD", "")
-    info.AirportA = RegReadString(HKEY_CURRENT_USER, REG_SETTINGS_KEY, "AirportA", "")
-    info.AirportL = RegReadString(HKEY_CURRENT_USER, REG_SETTINGS_KEY, "AirportL", "")
     
     'Load the Pilot ID from alternate source if not found
     If (frmMain.txtPilotID.Text = "") Then
@@ -95,61 +126,110 @@ Public Sub Class_Initialize()
     
     'Check if SB3 is installed
     SB3Installed = SB3InstallCheck()
+    
+    'Check for config update flag
+    ForceCfgUpdate = RegReadBoolean(HKEY_LOCAL_MACHINE, REG_SETTINGS_KEY, "UpdateConfig", False)
 
     'Load button states
     SavePassword = RegReadBoolean(HKEY_CURRENT_USER, REG_SETTINGS_KEY, "SavePassword", True)
+    ShowPilotNames = RegReadBoolean(HKEY_CURRENT_USER, REG_SETTINGS_KEY, "ShowUserNames", False)
+    HideMessagesWhenBusy = RegReadBoolean(HKEY_CURRENT_USER, REG_SETTINGS_KEY, "HideMessagesWhenBusy", False)
+    HideWhenMinimized = RegReadBoolean(HKEY_CURRENT_USER, REG_SETTINGS_KEY, "HideOnMinimize", False)
+    SterileCockpit = RegReadBoolean(HKEY_CURRENT_USER, REG_SETTINGS_KEY, "SterileCockpit", False)
     PlaySound = RegReadBoolean(HKEY_LOCAL_MACHINE, REG_SETTINGS_KEY, "PlaySoundForChat", True)
     FlyOffline = RegReadBoolean(HKEY_LOCAL_MACHINE, REG_SETTINGS_KEY, "FlyOffline", False)
+    GaugeSupport = RegReadBoolean(HKEY_LOCAL_MACHINE, REG_SETTINGS_KEY, "GaugeIntegration", False)
+    FreezeWindow = RegReadBoolean(HKEY_CURRENT_USER, REG_SETTINGS_KEY, "FreezeWindow", False)
     ShowTimestamps = RegReadBoolean(HKEY_LOCAL_MACHINE, REG_SETTINGS_KEY, "ShowTimestamps", True)
     ShowDebug = RegReadBoolean(HKEY_LOCAL_MACHINE, REG_SETTINGS_KEY, "ShowDebug", False)
-    SB3Support = RegReadBoolean(HKEY_LOCAL_MACHINE, REG_SETTINGS_KEY, "SB3Support", False) And SB3Installed
-    IVAPSupport = RegReadBoolean(HKEY_LOCAL_MACHINE, REG_SETTINGS_KEY, "IVAPSupport", False) And False
+    WideFSInstalled = RegReadBoolean(HKEY_LOCAL_MACHINE, REG_SETTINGS_KEY, "WideFS", False)
+    TS2Support = RegReadBoolean(HKEY_LOCAL_MACHINE, REG_SETTINGS_KEY, "TS2Support", False) _
+        And TS2Installed
+    SB3Support = RegReadBoolean(HKEY_LOCAL_MACHINE, REG_SETTINGS_KEY, "SB3Support", False) _
+        And (SB3Installed Or WideFSInstalled)
 End Sub
 
-Public Sub UpdateSettingsMenu()
-    frmMain.mnuOptionsFlyOffline.Checked = FlyOffline
-    frmMain.mnuOptionsPlaySoundForChat.Checked = PlaySound
-    frmMain.mnuOptionsSavePassword.Checked = SavePassword
-    frmMain.mnuOptionsShowTimestamps.Checked = ShowTimestamps
-    frmMain.mnuOptionsShowDebugMessages.Checked = ShowDebug
-    frmMain.mnuOptionsSB3Support.Enabled = SB3Installed
-    frmMain.mnuOptionsSB3Support.Checked = SB3Support
-    frmMain.mnuOptionsIVAPSupport.Checked = IVAPSupport
+Property Get IsFS9() As Boolean
+    IsFS9 = (FS9Data <> "")
+End Property
+
+Property Get FS9Files() As String
+    FS9Files = FS9Data
+End Property
+
+Property Let IsFS9(fs9 As Boolean)
+    If Not fs9 Then
+        FS9Data = ""
+        Exit Property
+    End If
     
-    'Update SB3 support
-    frmMain.mnuSaveFlightPlan.Enabled = SB3Support
+    'Load the My Documents folder
+    Dim buf As String
+    buf = Space$(260)
+    If (SHGetFolderPath(frmMain.hWnd, CSIDL_MYDOCUMENTS, 0&, -1&, buf) = 0) Then
+        FS9Data = Left(buf, InStr(buf, vbNullChar) - 1) + "\Flight Simulator Files"
+        If ShowDebug Then ShowMessage "Detected FS9 data folder " + FS9Data, DEBUGTEXTCOLOR
+    Else
+        ShowMessage "Cannot find My Documents folder - FS9 Data persistence disabled", ACARSERRORCOLOR
+    End If
+End Property
+
+Public Sub UpdateSettingsMenu()
+    With frmMain
+        .mnuOptionsFlyOffline.Checked = FlyOffline
+        .mnuCOMPlaySoundForChat.Checked = PlaySound
+        .mnuOptionsSavePassword.Checked = SavePassword
+        .mnuCOMShowTimestamps.Checked = ShowTimestamps
+        .mnuOptionsShowPilotNames.Checked = ShowPilotNames
+        .mnuOptionsGaugeIntegration.Checked = GaugeSupport
+        .mnuOptionsShowDebugMessages.Checked = ShowDebug
+        .mnuOptionsHide.Checked = HideWhenMinimized
+        .mnuCOMHideBusy.Checked = HideMessagesWhenBusy
+        .mnuCOMFreezeWindow.Checked = FreezeWindow
+        .mnuCOMSterileCockpit.Checked = SterileCockpit
+        .mnuOptionsSB3Support.enabled = SB3Installed Or WideFSInstalled
+        .mnuOptionsSB3Support.Checked = SB3Support
+        .mnuOptionsTS2Support.enabled = TS2Installed And False
+        .mnuOptionsTS2Support.Checked = TS2Support
+        .mnuOptionsWideFS.Checked = WideFSInstalled
+        
+        'Update SB3 support
+        .mnuSaveFlightPlan.enabled = SB3Support
+        .SSTab1.TabVisible(3) = ShowDebug
+    End With
 End Sub
 
 Public Sub UpdateFlightInfo()
+    frmMain.txtFlightNumber.Text = info.FlightNumber
     frmMain.txtCruiseAlt.Text = info.CruiseAltitude
     frmMain.txtRemarks.Text = info.Remarks
     frmMain.txtRoute.Text = info.Route
-    frmMain.cboAirportD.ListIndex = GetAirport(info.AirportD) + 1
-    frmMain.cboAirportA.ListIndex = GetAirport(info.AirportA) + 1
-    frmMain.cboAirportL.ListIndex = GetAirport(info.AirportL) + 1
+    frmMain.cboNetwork.Text = info.Network
+    frmMain.cboAirportD.ListIndex = GetAirportOfs(info.airportD) + 1
+    frmMain.cboAirportA.ListIndex = GetAirportOfs(info.AirportA) + 1
+    frmMain.cboAirportL.ListIndex = GetAirportOfs(info.AirportL) + 1
+    If info.CheckRide Then frmMain.chkCheckRide.value = 1
 End Sub
 
 Public Sub Save()
     'Save Flight Data to registry
     RegWriteString HKEY_CURRENT_USER, REG_SETTINGS_KEY, "Pilot ID", frmMain.txtPilotID.Text
     RegWriteString HKEY_CURRENT_USER, REG_SETTINGS_KEY, "Password", IIf(SavePassword, frmMain.txtPassword.Text, "")
-    RegWriteString HKEY_CURRENT_USER, REG_SETTINGS_KEY, "FlightNumber", frmMain.txtFlightNumber.Text
-    RegWriteString HKEY_CURRENT_USER, REG_SETTINGS_KEY, "Equipment", info.EquipmentType
-    RegWriteString HKEY_CURRENT_USER, REG_SETTINGS_KEY, "Altitude", info.CruiseAltitude
-    RegWriteString HKEY_CURRENT_USER, REG_SETTINGS_KEY, "AirportD", info.AirportD
-    RegWriteString HKEY_CURRENT_USER, REG_SETTINGS_KEY, "AirportA", info.AirportA
-    RegWriteString HKEY_CURRENT_USER, REG_SETTINGS_KEY, "AirportL", info.AirportL
-    RegWriteString HKEY_CURRENT_USER, REG_SETTINGS_KEY, "Route", info.Route
-    RegWriteString HKEY_CURRENT_USER, REG_SETTINGS_KEY, "Remarks", info.Remarks
 
     'Save settings
     RegWriteBoolean HKEY_CURRENT_USER, REG_SETTINGS_KEY, "SavePassword", SavePassword
     RegWriteBoolean HKEY_LOCAL_MACHINE, REG_SETTINGS_KEY, "PlaySoundForChat", PlaySound
+    RegWriteBoolean HKEY_LOCAL_MACHINE, REG_SETTINGS_KEY, "GaugeIntegration", GaugeSupport
     RegWriteBoolean HKEY_LOCAL_MACHINE, REG_SETTINGS_KEY, "FlyOffline", FlyOffline
     RegWriteBoolean HKEY_LOCAL_MACHINE, REG_SETTINGS_KEY, "ShowTimestamps", ShowTimestamps
+    RegWriteBoolean HKEY_CURRENT_USER, REG_SETTINGS_KEY, "FreezeWindow", FreezeWindow
     RegWriteBoolean HKEY_LOCAL_MACHINE, REG_SETTINGS_KEY, "ShowDebug", ShowDebug
+    RegWriteBoolean HKEY_CURRENT_USER, REG_SETTINGS_KEY, "HideOnMinimize", HideWhenMinimized
+    RegWriteBoolean HKEY_CURRENT_USER, REG_SETTINGS_KEY, "HideMessagesWhenBusy", HideMessagesWhenBusy
+    RegWriteBoolean HKEY_CURRENT_USER, REG_SETTINGS_KEY, "SterileCockpit", SterileCockpit
+    RegWriteBoolean HKEY_LOCAL_MACHINE, REG_SETTINGS_KEY, "WideFS", WideFSInstalled
     RegWriteBoolean HKEY_LOCAL_MACHINE, REG_SETTINGS_KEY, "SB3Support", SB3Support
-    RegWriteBoolean HKEY_LOCAL_MACHINE, REG_SETTINGS_KEY, "IVAPSupport", IVAPSupport
+    RegWriteBoolean HKEY_LOCAL_MACHINE, REG_SETTINGS_KEY, "TS2Support", TS2Support
 End Sub
 
 Property Get ACARSHost() As String
@@ -160,24 +240,36 @@ Property Get ACARSPort() As Integer
     ACARSPort = ACARS_Port
 End Property
 
-Property Get AirportNames() As Variant
-    AirportNames = aNames
+Property Get Airports() As Variant
+    Airports = airportInfo
 End Property
 
-Property Get AirportCodes() As Variant
-    AirportCodes = aCodes
+Property Get AirportNames() As Variant
+    Dim x As Integer
+    Dim a As Airport
+    Dim result As Variant
+    
+    ReDim result(UBound(airportInfo))
+    For x = 0 To UBound(airportInfo)
+        Set a = airportInfo(x)
+        result(x) = a.Name + " (" + a.ICAO + ")"
+    Next
+        
+    AirportNames = result
 End Property
 
 Property Get EquipmentTypes() As Variant
     EquipmentTypes = eqTypes
 End Property
 
-Public Sub AddAirport(ByVal name As String, ByVal icao As String)
-    ReDim Preserve aNames(UBound(aNames) + 1)
-    ReDim Preserve aCodes(UBound(aCodes) + 1)
-    aNames(UBound(aNames)) = name
-    aCodes(UBound(aCodes)) = icao
+Public Sub AddAirport(ap As Airport)
+    ReDim Preserve airportInfo(UBound(airportInfo) + 1)
+    Set airportInfo(UBound(airportInfo)) = ap
 End Sub
+
+Public Function GetAirportByOfs(ofs As Integer) As Airport
+    If (ofs >= 0) Then Set GetAirportByOfs = airportInfo(ofs)
+End Function
 
 Public Sub AddEquipment(ByVal eqType As String)
     ReDim Preserve eqTypes(UBound(eqTypes) + 1)
@@ -188,17 +280,58 @@ Public Sub ClearEquipment()
     eqTypes = Array()
 End Sub
 
+Public Sub ClearRoles()
+    Roles = Array()
+End Sub
+
+Public Sub AddRole(ByVal RoleName As String)
+    If Not HasRole(RoleName) Then
+        ReDim Preserve Roles(UBound(Roles) + 1)
+        Roles(UBound(Roles)) = RoleName
+    End If
+End Sub
+
+Public Function HasRole(ByVal RoleName As String) As Boolean
+    Dim rName As Variant
+
+    If (UBound(Roles) = -1) Then Exit Function
+    
+    'Loop through the roles
+    For Each rName In Roles
+        If ((rName = RoleName) Or (rName = "Admin")) Then
+            HasRole = True
+            Exit Function
+        End If
+    Next
+End Function
+
 Public Function IsConfigUpToDate() As Boolean
     Dim apDate As Date
     Dim eqDate As Date
     Dim age As Integer
+    
+    'Check for override flag
+    If ForceCfgUpdate Then
+        IsConfigUpToDate = True
+        Exit Function
+    End If
+
+    'Set error handler
+    On Error GoTo FatalError
 
     'Calculate average age of the data files
-    apDate = FileDateTime(App.Path + "\" + AIRPORT_DATA)
-    eqDate = FileDateTime(App.Path + "\" + EQ_DATA)
+    apDate = FileDateTime(App.path + "\" + AIRPORT_DATA)
+    eqDate = FileDateTime(App.path + "\" + EQ_DATA)
     age = (DateDiff("d", apDate, Now) + DateDiff("d", eqDate, Now)) / 2
     
     IsConfigUpToDate = (age <= 21)
+    
+ExitFunc:
+    Exit Function
+    
+FatalError:
+    Resume ExitFunc
+    
 End Function
 
 Public Sub SaveEquipment()
@@ -208,7 +341,7 @@ Public Sub SaveEquipment()
     On Error GoTo FatalError
     
     fNum = FreeFile()
-    Open App.Path + "\" + EQ_DATA For Output As #fNum
+    Open App.path + "\" + EQ_DATA For Output As #fNum
     For x = 0 To UBound(eqTypes)
         Print #fNum, eqTypes(x)
     Next
@@ -232,13 +365,13 @@ Public Sub LoadEquipment()
     On Error GoTo FatalError
     
     fNum = FreeFile()
-    Open App.Path + "\" + EQ_DATA For Input As #fNum
+    Open App.path + "\" + EQ_DATA For Input As #fNum
     rawData = Split(Input(LOF(fNum), fNum), vbCrLf)
     Close #fNum
     
     ClearEquipment
     For Each eq In rawData
-        AddEquipment eq
+        If (Len(eq) > 1) Then AddEquipment eq
     Next
     
 ExitSub:
@@ -251,23 +384,35 @@ FatalError:
 End Sub
 
 Public Sub ClearAirports()
-    aNames = Array()
-    aCodes = Array()
+    airportInfo = Array()
 End Sub
 
 Public Sub SaveAirports()
     Dim fNum As Integer
     Dim x As Integer
+    Dim a As Airport
     
+    Dim lat As String
+    Dim lng As String
+    
+    'Set critical error handler
     On Error GoTo FatalError
     
+    'Save the airports
     fNum = FreeFile()
-    Open App.Path + "\" + AIRPORT_DATA For Output As #fNum
-    For x = 0 To UBound(aNames)
-        Print #fNum, aNames(x) + "," + aCodes(x)
+    Open App.path + "\" + AIRPORT_DATA For Output As #fNum
+    For x = 0 To UBound(airportInfo)
+        Set a = airportInfo(x)
+        lat = Replace(Format(a.Latitude, "##0.00000"), DecimalSeparator, ".")
+        lng = Replace(Format(a.Longitude, "##0.00000"), DecimalSeparator, ".")
+        Print #fNum, a.Name + "," + a.IATA + "," + a.ICAO + "," + lat + "," + lng
     Next
     
     Close #fNum
+    
+    'Clear the force update flag if present
+    ForceCfgUpdate = False
+    RegDelValue HKEY_CURRENT_USER, REG_SETTINGS_KEY, "UpdateConfig"
     
 ExitSub:
     Exit Sub
@@ -283,17 +428,29 @@ Public Sub LoadAirports()
     Dim rawData As Variant
     Dim apData As Variant
     Dim rawAirport As Variant
+    Dim a As Airport
     
     On Error GoTo FatalError
 
     fNum = FreeFile()
-    Open App.Path + "\" + AIRPORT_DATA For Input As #fNum
+    Open App.path + "\" + AIRPORT_DATA For Input As #fNum
     rawData = Split(Input(LOF(fNum), fNum), vbCrLf)
     Close #fNum
     
     For Each rawAirport In rawData
         apData = Split(rawAirport, ",")
-        If (UBound(apData) > 0) Then AddAirport apData(0), apData(1)
+        If (UBound(apData) > 0) Then
+            Set a = New Airport
+            a.Name = apData(0)
+            a.IATA = apData(1)
+            If (UBound(apData) > 1) Then
+                a.ICAO = apData(2)
+                a.Latitude = CDbl(Replace(apData(3), ".", DecimalSeparator))
+                a.Longitude = CDbl(Replace(apData(4), ".", DecimalSeparator))
+            End If
+            
+            AddAirport a
+        End If
     Next
     
 ExitSub:
@@ -305,33 +462,59 @@ FatalError:
 
 End Sub
 
-Public Function GetAirport(ByVal code As String) As Integer
+Public Function GetAirport(ByVal code As String) As Airport
     Dim x As Integer
+    Dim a As Airport
     
-    For x = 0 To UBound(aCodes)
-        If (code = aCodes(x)) Then
-            GetAirport = x
+    For x = 0 To UBound(airportInfo)
+        Set a = airportInfo(x)
+        If ((code = a.IATA) Or (code = a.ICAO)) Then
+            Set GetAirport = a
             Exit Function
         End If
     Next
-    
-    GetAirport = 0
 End Function
 
-Public Sub SaveFlightInfo(FlightID As Long, Optional startTime As Date)
-    If (FlightID > 0) Then
-        RegWriteDWORD HKEY_CURRENT_USER, REG_SETTINGS_KEY, "FlightID", FlightID
-        RegWriteString HKEY_CURRENT_USER, REG_SETTINGS_KEY, "FlightStartTime", CStr(startTime)
+Private Function GetAirportOfs(a As Airport) As Integer
+    Dim x As Integer
+    Dim ap As Airport
+    
+    GetAirportOfs = -1
+    If (a Is Nothing) Then Exit Function
+    For x = 0 To UBound(airportInfo)
+        Set ap = airportInfo(x)
+        If (a.IATA = ap.IATA) Then
+            GetAirportOfs = x
+            Exit Function
+        End If
+    Next
+End Function
+
+Public Sub SaveFlightCode(flightCode As String)
+    If IsFS9 And (flightCode <> "") Then
+        RegWriteString HKEY_CURRENT_USER, REG_SETTINGS_KEY, "FlightID", flightCode
     Else
         RegDelValue HKEY_CURRENT_USER, REG_SETTINGS_KEY, "FlightID"
-        RegDelValue HKEY_CURRENT_USER, REG_SETTINGS_KEY, "FlightStartTime"
     End If
 End Sub
 
-Public Function LoadFlightInfo() As FlightData
-    Dim fInfo As New FlightData
+Public Function OldFlightID() As String
+    OldFlightID = RegReadString(HKEY_CURRENT_USER, REG_SETTINGS_KEY, "FlightID", "")
+End Function
+
+Public Function GetClosestAirport(ByVal lat As Double, ByVal lng As Double) As Airport
+    Dim result As Airport, a As Airport
+    Dim distance As Integer
+    Dim x As Integer
+
+    distance = 15000
+    For x = 0 To UBound(airportInfo)
+        Set a = airportInfo(x)
+        If (a.DistanceTo(lat, lng) < distance) Then
+            Set result = a
+            distance = a.DistanceTo(lat, lng)
+        End If
+    Next
     
-    fInfo.FlightID = RegReadDWORD(HKEY_CURRENT_USER, REG_SETTINGS_KEY, "FlightID", 0)
-    fInfo.startTime = CDate(RegReadString(HKEY_CURRENT_USER, REG_SETTINGS_KEY, "FlightStartTime", CStr(Now)))
-    Set LoadFlightInfo = fInfo
+    Set GetClosestAirport = result
 End Function

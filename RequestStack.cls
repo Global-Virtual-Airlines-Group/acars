@@ -14,6 +14,7 @@ Attribute VB_Exposed = False
 Option Explicit
 
 Const ACARSVERSION = 1
+Public HasData As Boolean
 
 Private doc As New DOMDocument
 Private root As IXMLDOMElement
@@ -24,11 +25,12 @@ Private ReqID As Long
 
 Public Sub Class_Initialize()
     RootDate = DateSerial(2005, 6, 1)
-    reset
+    Reset
 End Sub
 
-Private Sub reset()
+Private Sub Reset()
     Dim tmpID As Long
+    
     tmpID = DateDiff("s", RootDate, Now)
     If (tmpID = ReqID) Then
         ReqID = ReqID + 1
@@ -43,6 +45,7 @@ Private Sub reset()
     'Set ACARS version and request ID attributes.
     root.setAttribute "version", ACARSVERSION
     root.setAttribute "id", Hex(ReqID)
+    HasData = False
 End Sub
 
 Property Get LastUse() As Date
@@ -55,6 +58,7 @@ End Property
 
 Public Sub Queue(cmd As IXMLDOMElement)
     root.appendChild cmd
+    HasData = True
 End Sub
 
 Public Sub Send()
@@ -62,12 +66,16 @@ Public Sub Send()
     On Error GoTo EH
 
     'Send the data
-    frmMain.wsckMain.SendData "<?xml version=""1.0"" encoding=""UTF-8"" ?>" & doc.XML
+    frmMain.wsckMain.SendData "<?xml version=""1.0"" encoding=""UTF-8"" ?>" & doc.xml
     LastSendTime = Now
-    If config.ShowDebug Then ShowMessage "Sending Message " + Hex(ReqID), DEBUGTEXTCOLOR
+    HasData = False
+    If config.ShowDebug Then
+        ShowMessage "Sending Message " + Hex(ReqID), DEBUGTEXTCOLOR
+        ShowDebug doc.xml, XML_OUT_COLOR
+    End If
     
 ExitSub:
-    reset
+    Reset
     Exit Sub
 
 EH:

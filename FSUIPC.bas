@@ -160,7 +160,7 @@ Public Const FS6IPC_READSTATEDATA_ID = 1
 Public Const FS6IPC_WRITESTATEDATA_ID = 2
 Public Const FS6IPC_SPECIALREQUEST_ID = &HABAC
 
-
+Private ErrorText As Variant
   
 ' declare the record types for reading and writing comms with UIPC
 Public Type FS6IPC_READSTATEDATA_HDR
@@ -207,6 +207,18 @@ Sub FSUIPC_Initialization()
   m_hMap = 0
   m_pView& = 0
   m_pNext& = 0
+  
+  'Init the error text
+  ErrorText = Array("Connected", "Attempt to Open when already Open", _
+    "Cannot link to FSUIPC or WideClient", "Failed to Register common message with Windows", _
+    "Failed to create Atom for mapping filename", "Failed to create a file mapping object", _
+    "Failed to open a view to the file map", "Incorrect version of FSUIPC, or not FSUIPC", _
+    "Flight Simulator is not version requested", "Call cannot execute, link not Open", _
+    "Call cannot execute: no requests accumulated", "IPC timed out", _
+    "IPC sendmessage failed", "IPC request contains bad data", _
+    "Maybe running on WideClient, but FS not running on Server, or wrong FSUIPC", _
+    "Read or Write request cannot be added, memory for Process is full", _
+    "ACARS FSUIPC interface error", "Flight Simulator not running")
 End Sub
 
 
@@ -558,4 +570,11 @@ Dim pHdr As FS6IPC_WRITESTATEDATA_HDR
   FSUIPC_WriteS = True
 End Function
 
-
+Function FSUIPC_Error(ByVal errCode As Integer) As String
+    If ((errCode < 0) Or (errCode > UBound(ErrorText))) Then
+        FSUIPC_Error = "Unknown"
+        Exit Function
+    End If
+    
+    FSUIPC_Error = ErrorText(errCode)
+End Function

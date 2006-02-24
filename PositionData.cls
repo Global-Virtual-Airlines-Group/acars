@@ -14,8 +14,8 @@ Attribute VB_Exposed = False
 Option Explicit
 
 'Date/time of flight data
-Public DateTime As PositionDate
-Public Phase As String
+Public DateTime As New UTCDate
+Public phase As String
 
 'Latitude/longitude
 Public Latitude As Double
@@ -26,6 +26,9 @@ Public Mach As Double
 Public AirSpeed As Integer
 Public GroundSpeed As Integer
 Public VerticalSpeed As Integer
+Public TouchdownSpeed As Integer
+Public Pitch As Double
+Public Bank As Double
 Public Heading As Integer
 Public AltitudeMSL As Long
 Public AltitudeAGL As Long
@@ -33,11 +36,14 @@ Public Flaps As Integer
 Public Spoilers As Boolean
 Public GearDown As Boolean
 Public EnginesStarted As Boolean
+Public WindSpeed As Integer
+Public WindHeading As Integer
 
 'Flight state flags
 Public Paused As Boolean
 Public Slewing As Boolean
 Public onGround As Boolean
+Public AfterBurner As Boolean
 Public Parked As Boolean
 Public simRate As Integer
 
@@ -54,38 +60,43 @@ Public AT_MCH As Boolean
 Private engN1(3) As Double
 Private engN2(3) As Double
 Private engThrottle(3) As Integer
+Private engFlow(3) As Long
 Private engCount As Integer
 
 'Fuel/Weight state
-Public Fuel As Long
-Public Weight As Long
+Public fuel As Long
+Public weight As Long
 
-Public Sub Class_Initialize()
-    Set DateTime = New PositionDate
-End Sub
-
-Public Sub setN1(ByVal engNum As Integer, n1 As Double)
+Public Sub setN1(ByVal engNum As Byte, n1 As Double)
     engN1(engNum) = n1
 End Sub
 
-Public Sub setN2(ByVal engNum As Integer, n2 As Double)
+Public Sub setN2(ByVal engNum As Byte, n2 As Double)
     engN2(engNum) = n2
 End Sub
 
-Public Sub setThrottle(ByVal engNum As Integer, tr As Integer)
+Public Sub setThrottle(ByVal engNum As Byte, tr As Integer)
     engThrottle(engNum) = tr
 End Sub
 
-Public Function getN1(ByVal engNum As Integer) As Double
+Public Sub setFuelFlow(ByVal engNum As Byte, flow As Long)
+    engFlow(engNum) = flow
+End Sub
+
+Public Function getN1(ByVal engNum As Byte) As Double
     getN1 = engN1(engNum)
 End Function
 
-Public Function getN2(ByVal engNum As Integer) As Double
+Public Function getN2(ByVal engNum As Byte) As Double
     getN2 = engN2(engNum)
 End Function
 
 Public Function getThrottle(ByVal engNum As Byte) As Integer
     getThrottle = engThrottle(engNum)
+End Function
+
+Public Function getFuelFlow(ByVal engNum As Byte) As Long
+    getFuelFlow = engFlow(engNum)
 End Function
 
 Property Let EngineCount(ByVal eCount As Integer)
@@ -123,4 +134,58 @@ Property Get AverageThrottle() As Integer
     Next
     
     AverageThrottle = totalT / engCount
+End Property
+
+Property Get FuelFlow() As Long
+    Dim x As Integer
+    Dim totalFlow As Long
+    
+    For x = 0 To (engCount - 1)
+        totalFlow = totalFlow + engFlow(x)
+    Next
+    
+    FuelFlow = totalFlow
+End Property
+
+Private Sub Class_Initialize()
+    DateTime.LocalTime = Now
+    AP_HDG = False
+    AP_NAV = False
+    AP_GPS = False
+    AP_APR = False
+    AP_ALT = False
+    AT_IAS = False
+    AT_MCH = False
+    Paused = False
+    Slewing = False
+    Spoilers = False
+    GearDown = False
+    onGround = False
+    EnginesStarted = False
+    Parked = False
+    AfterBurner = False
+End Sub
+
+Property Get Flags() As Long
+    Dim tmpFlags As Long
+    
+    tmpFlags = 0
+    
+    'Build the flags
+    If Paused Then tmpFlags = tmpFlags Or FLIGHTPAUSED
+    If Slewing Then tmpFlags = tmpFlags Or FLIGHTSLEWING
+    If Parked Then tmpFlags = tmpFlags Or FLIGHTPARKED
+    If onGround Then tmpFlags = tmpFlags Or FLIGHTONGROUND
+    If Spoilers Then tmpFlags = tmpFlags Or FLIGHT_SP_ARM
+    If GearDown Then tmpFlags = tmpFlags Or FLIGHT_GEAR_DOWN
+    If AfterBurner Then tmpFlags = tmpFlags Or FLIGHT_AFTERBURNER
+    If AP_NAV Then tmpFlags = tmpFlags Or FLIGHT_AP_NAV
+    If AP_GPS Then tmpFlags = tmpFlags Or FLIGHT_AP_GPS
+    If AP_HDG Then tmpFlags = tmpFlags Or FLIGHT_AP_HDG
+    If AP_APR Then tmpFlags = tmpFlags Or FLIGHT_AP_APR
+    If AP_ALT Then tmpFlags = tmpFlags Or FLIGHT_AP_ALT
+    If AT_IAS Then tmpFlags = tmpFlags Or FLIGHT_AT_IAS
+    If AT_MCH Then tmpFlags = tmpFlags Or FLIGHT_AT_MACH
+    
+    Flags = tmpFlags
 End Property
