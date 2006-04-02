@@ -82,6 +82,9 @@ Public PrivateVoiceURL As String
 Public MsgReceived As Boolean
 Public Busy As Boolean
 
+'Saved flights folder
+Public SavedFlightsPath As String
+
 Private FS9Data As String
 Private ForceCfgUpdate As Boolean
 
@@ -93,7 +96,7 @@ Private Const CSIDL_LOCAL_APPDATA = &H1C&
 'Win32 API functions to get My Docs folder
 'Private Declare Function lstrlenW Lib "kernel32" (ByVal lpString As Long) As Long
 Private Declare Function SHGetFolderPath Lib "shfolder.dll" Alias "SHGetFolderPathA" _
-  (ByVal hWnd As Long, ByVal nFolder As Long, ByVal hToken As Long, ByVal dwReserved As Long, _
+  (ByVal hwnd As Long, ByVal nFolder As Long, ByVal hToken As Long, ByVal dwReserved As Long, _
   ByVal lpszPath As String) As Long
 
 Public Sub Class_Initialize()
@@ -129,8 +132,11 @@ Public Sub Class_Initialize()
     
     'Check for config update flag
     ForceCfgUpdate = RegReadBoolean(HKEY_LOCAL_MACHINE, REG_SETTINGS_KEY, "UpdateConfig", False)
+    
+    'Load saved flight path
+    SavedFlightsPath = RegReadString(HKEY_LOCAL_MACHINE, REG_SETTINGS_KEY, "SavedFlights", "")
 
-    'Load button states
+    'Load menu options
     SavePassword = RegReadBoolean(HKEY_CURRENT_USER, REG_SETTINGS_KEY, "SavePassword", True)
     ShowPilotNames = RegReadBoolean(HKEY_CURRENT_USER, REG_SETTINGS_KEY, "ShowUserNames", False)
     HideMessagesWhenBusy = RegReadBoolean(HKEY_CURRENT_USER, REG_SETTINGS_KEY, "HideMessagesWhenBusy", False)
@@ -166,7 +172,7 @@ Property Let IsFS9(fs9 As Boolean)
     'Load the My Documents folder
     Dim buf As String
     buf = Space$(260)
-    If (SHGetFolderPath(frmMain.hWnd, CSIDL_MYDOCUMENTS, 0&, -1&, buf) = 0) Then
+    If (SHGetFolderPath(frmMain.hwnd, CSIDL_MYDOCUMENTS, 0&, -1&, buf) = 0) Then
         FS9Data = Left(buf, InStr(buf, vbNullChar) - 1) + "\Flight Simulator Files"
         If ShowDebug Then ShowMessage "Detected FS9 data folder " + FS9Data, DEBUGTEXTCOLOR
     Else
@@ -215,6 +221,7 @@ Public Sub Save()
     'Save Flight Data to registry
     RegWriteString HKEY_CURRENT_USER, REG_SETTINGS_KEY, "Pilot ID", frmMain.txtPilotID.Text
     RegWriteString HKEY_CURRENT_USER, REG_SETTINGS_KEY, "Password", IIf(SavePassword, frmMain.txtPassword.Text, "")
+    RegWriteString HKEY_LOCAL_MACHINE, REG_SETTINGS_KEY, "SavedFlights", SavedFlightsPath
 
     'Save settings
     RegWriteBoolean HKEY_CURRENT_USER, REG_SETTINGS_KEY, "SavePassword", SavePassword

@@ -42,7 +42,7 @@ Private Time4X As Long
 'Track request numbers for special messages
 Private Auth_ReqID As Long
 Private Info_ReqID As Long
-Private PIREP_ReqID As Long
+'Private PIREP_ReqID As Long
 
 'Flight Start Data
 Public StartTime As New UTCDate
@@ -156,25 +156,17 @@ Property Get AuthReqID() As Long
     AuthReqID = Auth_ReqID
 End Property
 
-Property Let AuthReqID(id As Long)
-    Auth_ReqID = id
-    If config.ShowDebug Then ShowMessage "AuthReq = " + Hex(id), DEBUGTEXTCOLOR
+Property Let AuthReqID(ID As Long)
+    Auth_ReqID = ID
+    If config.ShowDebug Then ShowMessage "AuthReq = " + Hex(ID), DEBUGTEXTCOLOR
 End Property
 
 Property Get InfoReqID() As Long
     InfoReqID = Info_ReqID
 End Property
 
-Property Let InfoReqID(id As Long)
-    Info_ReqID = id
-    If config.ShowDebug Then ShowMessage "InfoReq = " + Hex(id), DEBUGTEXTCOLOR
+Property Let InfoReqID(ID As Long)
+    Info_ReqID = ID
+    If config.ShowDebug Then ShowMessage "InfoReq = " + Hex(ID), DEBUGTEXTCOLOR
 End Property
 
-Property Get PIREPReqID() As Long
-    PIREPReqID = PIREP_ReqID
-End Property
-
-Property Let PIREPReqID(id As Long)
-    PIREP_ReqID = id
-    If config.ShowDebug Then ShowMessage "PIREPReq = " + Hex(id), DEBUGTEXTCOLOR
-End Property
