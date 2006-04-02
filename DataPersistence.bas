@@ -47,6 +47,7 @@ Public Sub PersistFlightData(Optional writeMsg As Boolean = False)
     If Not (info.AirportL Is Nothing) Then AddXMLField inf, "airportL", info.AirportL.IATA, False
     AddXMLField inf, "route", info.Route
     AddXMLField inf, "remarks", info.Remarks
+    AddXMLField inf, "network", info.Network
     AddXMLField inf, "startTime", FormatDateTime(info.StartTime.UTCTime, "mm/dd/yyyy hh:nn:ss")
     AddXMLField inf, "fs_ver", CStr(info.FSVersion), False
     If info.Offline Then AddXMLField inf, "offline", "true", False
@@ -190,6 +191,7 @@ Public Function RestoreFlightData(ByVal flightCode As String) As SavedFlight
     'Calculate the file name root
     frmMain.MousePointer = vbHourglass
     fRoot = App.path + "\ACARS Flight " + flightCode
+    If Not FileExists(fRoot + ".sha") Or Not FileExists(fRoot + ".xml") Then Exit Function
 
     'Get the SHA256 hash value
     fNum = FreeFile()
@@ -220,7 +222,7 @@ Public Function RestoreFlightData(ByVal flightCode As String) As SavedFlight
     
         Set xmlError = doc.parseError
         strError = "Error code: " & xmlError.errorCode & vbCrLf _
-            & "Reason: " & xmlError.reason & vbCrLf _
+            & "Reason: " & xmlError.Reason & vbCrLf _
             & "Source: " & vbCrLf & xmlError.srcText
         MsgBox "The following error occurred while parsing flight data: " & _
             vbCrLf & vbCrLf & strError, vbCritical Or vbOKOnly, "Fatal Error!"
@@ -266,6 +268,8 @@ Public Function RestoreFlightData(ByVal flightCode As String) As SavedFlight
         .FlightPhase = CInt(getChild(inf, "phase", CStr(AIRBORNE)))
         .EquipmentType = getChild(inf, "equipment", "CRJ-200")
         .CruiseAltitude = getChild(inf, "altitude", "3000")
+        .Network = getChild(inf, "network", "Offline")
+        .CheckRide = CBool(getChild(inf, "checkRide", "false"))
         Set .airportD = config.GetAirport(getChild(inf, "airportD", ""))
         Set .AirportA = config.GetAirport(getChild(inf, "airportA", ""))
         Set .AirportL = config.GetAirport(getChild(inf, "airportL", ""))
@@ -288,15 +292,23 @@ Public Function RestoreFlightData(ByVal flightCode As String) As SavedFlight
         .LandingSpeed = CInt(getChild(inf, "landingSpeed", "0"))
         .LandingVSpeed = CInt(getChild(inf, "landingVSpeed", "0"))
         .GateTime.UTCTime = ParseDateTime(getChild(inf, "gateTime", ""))
+        If (Year(.GateTime.UTCTime) < 2000) Then .GateTime.UTCTime = .LandingTime.UTCTime
         .GateFuel = CLng(getChild(inf, "gateFuel", "0"))
         .GateWeight = CLng(getChild(inf, "gateWeight", "0"))
         .ShutdownTime.UTCTime = ParseDateTime(getChild(inf, "shutdownTime", ""))
+        If (Year(.ShutdownTime.UTCTime) < 2000) Then .ShutdownTime.UTCTime = .LandingTime.UTCTime
         .ShutdownFuel = CLng(getChild(inf, "shutdownFuel", "0"))
         .ShutdownWeight = CLng(getChild(inf, "shutdownWeight", "0"))
         .TimeAt1X = CLng(getChild(inf, "time1X", "0"))
         .TimeAt2X = CLng(getChild(inf, "time2X", "0"))
         .TimeAt4X = CLng(getChild(inf, "time4X", "0"))
-        .InFlight = (.FlightPhase <> COMPLETE)
+        If (.FlightPhase >= TAXI_IN) And (.FlightPhase <= COMPLETE) Then
+            .FlightData = True
+            .FlightPhase = COMPLETE
+            .InFlight = False
+        Else
+            .InFlight = True
+        End If
     End With
     
     'Load the position cache
@@ -398,19 +410,23 @@ Public Function SavedFlights() As Variant
     SavedFlights = results
 End Function
 
-Public Sub DeleteSavedFlight(ByVal flightCode As String)
+Public Sub DeleteSavedFlight(ByVal flightCode As String, Optional KillAll As Boolean = True)
     Dim fRoot As String
     
     On Error Resume Next
     fRoot = App.path + "\ACARS Flight " + flightCode
     
     'Kill the saved ACARS data
-    Kill fRoot + ".xml"
-    Kill fRoot + ".sha"
+    If KillAll Then
+        Kill fRoot + ".xml"
+        Kill fRoot + ".sha"
+    End If
     
     'Delete the saved flight
-    Kill config.FS9Files + "\" + "ACARS Flight " + flightCode + ".FLT"
-    Kill config.FS9Files + "\" + "ACARS Flight " + flightCode + ".WX"
+    If Not config.WideFSInstalled Then
+        Kill config.FS9Files + "\" + "ACARS Flight " + flightCode + ".FLT"
+        Kill config.FS9Files + "\" + "ACARS Flight " + flightCode + ".WX"
+    End If
     
     'Display message
     If config.ShowDebug Then ShowMessage "Deleted persisted data for Flight " + _
