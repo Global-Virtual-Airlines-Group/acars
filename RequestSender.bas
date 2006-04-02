@@ -48,12 +48,11 @@ Public Sub RequestDraftPIREPs()
     If config.ShowDebug Then ShowMessage "Sent draft Flight Report request", DEBUGTEXTCOLOR
 End Sub
 
-Public Sub SendFlightInfo(fInfo As FlightData)
+Public Function SendFlightInfo(fInfo As FlightData) As Long
     Dim cmd As IXMLDOMElement
 
     'Build the request and save the number
     Set cmd = buildCMD("flight_info")
-    fInfo.InfoReqID = ReqStack.RequestID
     
     'Add flight plan info
     AddXMLField cmd, "flight_num", fInfo.FlightNumber, False
@@ -73,10 +72,12 @@ Public Sub SendFlightInfo(fInfo As FlightData)
         ShowMessage "Resuming Flight " + CStr(fInfo.FlightID), ACARSTEXTCOLOR
     End If
     
+    'Queue the request
     ReqStack.Queue cmd
+    SendFlightInfo = ReqStack.RequestID
     
     If config.ShowDebug Then ShowMessage "Sent flight info", DEBUGTEXTCOLOR
-End Sub
+End Function
 
 Public Sub RequestPilotInfo(PilotID As String)
     Dim doc As New DOMDocument
@@ -211,15 +212,15 @@ Public Sub SendChat(msgText As String, Optional msgTo As String)
         If (p Is Nothing) Then
             ShowMessage msgTo & " is not logged in!", ACARSERRORCOLOR
             Exit Sub
-        ElseIf (p.id = frmMain.txtPilotID.Text) Then
+        ElseIf (p.ID = frmMain.txtPilotID.Text) Then
             Exit Sub
         End If
     
-        AddXMLField cmd, "to", p.id
+        AddXMLField cmd, "to", p.ID
         If config.ShowPilotNames Then
             msgFrom = msgFrom + "->" + p.Name
         Else
-            msgFrom = msgFrom + "->" + p.id
+            msgFrom = msgFrom + "->" + p.ID
         End If
     End If
 
@@ -231,14 +232,14 @@ Public Sub SendChat(msgText As String, Optional msgTo As String)
     If config.ShowDebug Then ShowMessage "Sent chat message", DEBUGTEXTCOLOR
 End Sub
 
-Public Function SendCredentials(userID As String, pwd As String) As Long
+Public Function SendCredentials(UserID As String, pwd As String) As Long
     Dim cmd As IXMLDOMElement
 
     'Build the request
     Set cmd = buildCMD("auth")
 
     'Add user and password
-    AddXMLField cmd, "user", userID, False
+    AddXMLField cmd, "user", UserID, False
     AddXMLField cmd, "password", pwd, True
     AddXMLField cmd, "build", App.Revision, False
     ReqStack.Queue cmd
@@ -255,13 +256,14 @@ Public Sub SendPing()
     If config.ShowDebug Then ShowMessage "Sent ping", DEBUGTEXTCOLOR
 End Sub
 
-Public Sub SendEndFlight()
+Public Function SendEndFlight() As Long
     Dim cmd As IXMLDOMElement
 
     'Build the request and send it
     ReqStack.Queue buildCMD("end_flight")
     If config.ShowDebug Then ShowMessage "Sent end_flight message", DEBUGTEXTCOLOR
-End Sub
+    SendEndFlight = ReqStack.RequestID
+End Function
 
 Public Sub RequestEquipment()
     Dim cmd As IXMLDOMElement

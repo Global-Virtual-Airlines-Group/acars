@@ -32,7 +32,7 @@ Private Sub Reset()
     Dim tmpID As Long
     
     tmpID = DateDiff("s", RootDate, Now)
-    If (tmpID = ReqID) Then
+    If (tmpID <= ReqID) Then
         ReqID = ReqID + 1
     Else
         ReqID = tmpID
@@ -66,12 +66,12 @@ Public Sub Send()
     On Error GoTo EH
 
     'Send the data
-    frmMain.wsckMain.SendData "<?xml version=""1.0"" encoding=""UTF-8"" ?>" & doc.xml
+    frmMain.wsckMain.SendData "<?xml version=""1.0"" encoding=""UTF-8"" ?>" & doc.XML
     LastSendTime = Now
     HasData = False
     If config.ShowDebug Then
         ShowMessage "Sending Message " + Hex(ReqID), DEBUGTEXTCOLOR
-        ShowDebug doc.xml, XML_OUT_COLOR
+        ShowDebug doc.XML, XML_OUT_COLOR
     End If
     
 ExitSub:

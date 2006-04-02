@@ -101,7 +101,7 @@ Public Sub ApplicationStartup()
         config.IsFS9 = True
         hasFLT = FileExists(config.FS9Files + "\" + "ACARS Flight " + oldID + ".FLT")
         If Not hasFLT And (Not (oldFlight Is Nothing)) Then
-            hasFLT = (oldFlight.FlightInfo.FlightPhase = COMPLETE)
+            hasFLT = oldFlight.FlightInfo.FlightData Or config.WideFSInstalled
         Else
             hasFLT = hasFLT And (Not (oldFlight Is Nothing))
         End If
@@ -119,7 +119,7 @@ Public Sub ApplicationStartup()
             Dim fName As String
             
             'Make sure FS is running if the flight is not complete
-            If oldFlight.FlightInfo.InFlight Then
+            If Not oldFlight.FlightInfo.FlightData Then
                 While Not IsFSRunning
                     If (MsgBox("Microsoft Flight Simulator has not been started.", _
                         vbExclamation + vbRetryCancel, "Flight Simulator NotStarted") = _
@@ -145,7 +145,6 @@ Public Sub ApplicationStartup()
             'Load the saved flight
             Set info = oldFlight.FlightInfo
             ShowMessage "Restored Flight ID " + SavedFlightID(info), ACARSTEXTCOLOR
-            info.InFlight = (info.FlightPhase <> COMPLETE)
             If oldFlight.HasData Then
                 Dim x As Integer
                 Dim pd As PositionData
@@ -160,7 +159,7 @@ Public Sub ApplicationStartup()
             End If
             
             'Load the flight into FS9
-            If info.InFlight Then
+            If Not info.FlightData Then
                 frmSplash.SetProgressLabel "Restoring Microsoft Flight Simulator"
                 fName = "ACARS Flight " + oldID + Chr(0)
                 Call FSUIPC_WriteS(&H3F04, Len(fName) + 1, fName, dwResult)
@@ -190,14 +189,17 @@ Public Sub ApplicationStartup()
             
                 'Load aircraft info
                 Set acInfo = GetAircraftInfo()
+            Else
+                MsgBox "ACARS has loaded your old Flight Data, and has enough information to file" & _
+                vbCrLf & "a Flight Report. Please connect to the ACARS server to file your PIREP.", _
+                vbOKOnly + vbInformation, "Flight Restored"
             End If
             
             'Reset button states
             With frmMain
                 .LockFlightInfo False
-                .cmdPIREP.visible = Not info.InFlight
-                .cmdPIREP.enabled = False
-                .mnuSaveFlightData.enabled = info.InFlight
+                .cmdPIREP.visible = True
+                .cmdPIREP.enabled = info.FlightData And config.ACARSConnected
                 .tmrPosUpdates.enabled = info.InFlight
                 .tmrFlightTime.enabled = info.InFlight
             End With
@@ -240,7 +242,7 @@ Public Sub ApplicationStartup()
     'Pause for 2 seconds
     frmSplash.ClearProgressLabel
     If (oldFlight Is Nothing) Then
-        While ((totalWait < 1500) And Not frmSplash.isClicked)
+        While ((totalWait < 1250) And Not frmSplash.isClicked)
             totalWait = totalWait + 100
             DoEvents
             Sleep 100

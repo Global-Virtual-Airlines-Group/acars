@@ -27,6 +27,7 @@ Begin VB.Form frmMain
    ScaleWidth      =   9420
    StartUpPosition =   3  'Windows Default
    Visible         =   0   'False
+   WhatsThisHelp   =   -1  'True
    Begin MSComDlg.CommonDialog CommonDialog1 
       Left            =   8160
       Top             =   3240
@@ -183,24 +184,30 @@ Begin VB.Form frmMain
       TabCaption(1)   =   "Connected Pilots"
       TabPicture(1)   =   "frmMain.frx":0028
       Tab(1).ControlEnabled=   0   'False
-      Tab(1).Control(0)=   "cmdBusy"
+      Tab(1).Control(0)=   "lstPilots"
       Tab(1).Control(0).Enabled=   0   'False
-      Tab(1).Control(1)=   "cmdUpdatePilotList"
+      Tab(1).Control(1)=   "infoFrame"
       Tab(1).Control(1).Enabled=   0   'False
-      Tab(1).Control(2)=   "infoFrame"
-      Tab(1).Control(3)=   "lstPilots"
+      Tab(1).Control(2)=   "cmdUpdatePilotList"
+      Tab(1).Control(2).Enabled=   0   'False
+      Tab(1).Control(3)=   "cmdBusy"
+      Tab(1).Control(3).Enabled=   0   'False
       Tab(1).ControlCount=   4
       TabCaption(2)   =   "Air Traffic Control"
       TabPicture(2)   =   "frmMain.frx":0044
       Tab(2).ControlEnabled=   0   'False
-      Tab(2).Control(0)=   "radioFrame"
+      Tab(2).Control(0)=   "lstATC"
+      Tab(2).Control(0).Enabled=   0   'False
       Tab(2).Control(1)=   "ctrFrame"
-      Tab(2).Control(2)=   "lstATC"
+      Tab(2).Control(1).Enabled=   0   'False
+      Tab(2).Control(2)=   "radioFrame"
+      Tab(2).Control(2).Enabled=   0   'False
       Tab(2).ControlCount=   3
       TabCaption(3)   =   "XML Message Data"
       TabPicture(3)   =   "frmMain.frx":0060
       Tab(3).ControlEnabled=   0   'False
       Tab(3).Control(0)=   "rtfDebug"
+      Tab(3).Control(0).Enabled=   0   'False
       Tab(3).ControlCount=   1
       TabCaption(4)   =   "TeamSpeak"
       TabPicture(4)   =   "frmMain.frx":007C
@@ -801,6 +808,7 @@ Begin VB.Form frmMain
          Left            =   3915
          TabIndex        =   2
          Top             =   265
+         WhatsThisHelpID =   104
          Width           =   950
       End
       Begin VB.TextBox txtPassword 
@@ -1111,10 +1119,6 @@ Begin VB.Form frmMain
       Begin VB.Menu mnuClearChatText 
          Caption         =   "Clear Chat Text"
       End
-      Begin VB.Menu mnuSaveFlightData 
-         Caption         =   "Save Flight &Data"
-         Enabled         =   0   'False
-      End
       Begin VB.Menu mnuFlightSep3 
          Caption         =   "-"
       End
@@ -1291,6 +1295,11 @@ Private Sub cmdKick_Click()
 End Sub
 
 Private Sub cmdPIREP_Click()
+    Dim msgID As Long
+    
+    'Set critical error handler
+    On Error GoTo FatalError
+
     'If we're not connected, then stop
     If Not config.ACARSConnected Then
         MsgBox "You must be connected to the ACARS server to file a Flight Report.", vbExclamation + vbOKOnly, "Not Connected"
@@ -1311,12 +1320,12 @@ Private Sub cmdPIREP_Click()
     
     'If we don't have a flight ID, then file the flight info
     If (info.FlightID = 0) Then
-        SendFlightInfo info
+        info.InfoReqID = SendFlightInfo(info)
         ReqStack.Send
         ShowMessage "Sending Offline Flight Information", ACARSTEXTCOLOR
     
         'If we time out, raise an error
-        If Not WaitForACK(info.InfoReqID, 7500) Then
+        If Not WaitForACK(msgID, 7500) Then
             MsgBox "ACARS Server timed out returning Flight ID!", vbCritical + vbOKOnly
             frmMain.cmdPIREP.enabled = True
             Exit Sub
@@ -1327,7 +1336,6 @@ Private Sub cmdPIREP_Click()
     If Positions.HasData Then
         Dim Queue As Variant
         Dim x As Integer
-        Dim msgID As Long
     
         'Display the progress bar
         Queue = Positions.Queue
@@ -1344,7 +1352,7 @@ Private Sub cmdPIREP_Click()
             If ((x Mod 4) = 0) Then
                 ReqStack.Send
                 frmMain.PositionProgress.Refresh
-                Call WaitForACK(msgID, 2500)
+                Call WaitForACK(msgID, 3000)
             End If
         Next
 
@@ -1353,28 +1361,27 @@ Private Sub cmdPIREP_Click()
     End If
     
     'End the flight (the ACARS server will discard multiple messages)
-    SendEndFlight
+    msgID = SendEndFlight
     ReqStack.Send
-    Sleep 750
-    DoEvents
+    Call WaitForACK(msgID, 1000)
 
     'Send the PIREP
-    info.PIREPReqID = SendPIREP(info)
+    msgID = SendPIREP(info)
     frmMain.PositionProgress.value = frmMain.PositionProgress.Max
-    ShowMessage "Sending Flight Report " + Hex(info.PIREPReqID), ACARSTEXTCOLOR
+    ShowMessage "Sending Flight Report " + Hex(msgID), ACARSTEXTCOLOR
     ReqStack.Send
     
     'Wait for the ACK
-    If Not WaitForACK(info.PIREPReqID, 15000) Then
+    If Not WaitForACK(msgID, 15000) Then
         MsgBox "ACARS Server timed out sending Flight Report!", vbCritical + vbOKOnly, "Time Out"
         cmdPIREP.enabled = True
         progressLabel.visible = False
-        mnuSaveFlightData.enabled = False
         Exit Sub
     End If
     
     'Kill the persisted data
-    DeleteSavedFlight info.FlightID
+    DeleteSavedFlight SavedFlightID(info)
+    config.SaveFlightCode ""
     
     'Reset the flight data and enable the fields
     txtFlightNumber.Text = ""
@@ -1386,8 +1393,28 @@ Private Sub cmdPIREP_Click()
     cboAirportA.ListIndex = 0
     cboAirportL.ListIndex = 0
     cboNetwork.ListIndex = 0
+    cboEquipment.ListIndex = 0
     chkCheckRide.value = 0
     LockFlightInfo True
+    
+    'Update buttons/info
+    Set info = New FlightData
+    config.UpdateFlightInfo
+    cmdStartStopFlight.enabled = True
+    cmdPIREP.visible = False
+    cmdPIREP.enabled = False
+    progressLabel.visible = False
+    PositionProgress.visible = False
+    MsgBox "Flight Report filed Successfully.", vbInformation + vbOKOnly, "Flight Report Filed"
+    
+ExitSub:
+    Exit Sub
+    
+FatalError:
+    MsgBox "Error filing Flight Report " + err.Description + " at Line " + CStr(Erl), vbCritical + _
+        vbOKOnly, "Flight Report Error"
+    Resume ExitSub
+    
 End Sub
 
 Private Sub cmdSend_Click()
@@ -1676,12 +1703,6 @@ Private Sub mnuSaveFlightPlan_Click()
     SB3Plan_Save
 End Sub
 
-Private Sub mnuSaveFlightData_Click()
-    If ((Not info.InFlight) Or (Not config.IsFS9) Or info.PIREPFiled) Then Exit Sub
-    PersistFlightData True
-    SaveFlight
-End Sub
-
 Private Sub mnuOptionsFlyOffline_Click()
     config.FlyOffline = Not config.FlyOffline
     config.UpdateSettingsMenu
@@ -1778,6 +1799,7 @@ Public Function StopFlight(Optional isError As Boolean = False) As Boolean
 
     'Clear the flight ID registry entry, and save the flight data
     If Not isError Then
+        DeleteSavedFlight SavedFlightID(info), False
         If (info.FlightPhase = COMPLETE) Then PersistFlightData True
         config.SaveFlightCode ""
     End If
@@ -1806,6 +1828,7 @@ Public Function StopFlight(Optional isError As Boolean = False) As Boolean
     If (info.FlightPhase = COMPLETE) Then
         cmdPIREP.visible = True
         cmdPIREP.enabled = config.ACARSConnected
+        cmdStartStopFlight.enabled = False
     End If
 End Function
 
@@ -1890,7 +1913,6 @@ Sub RestoreFlight()
     cmdStartStopFlight.Caption = "Stop Flight"
     cmdPIREP.visible = True
     cmdPIREP.enabled = False
-    mnuSaveFlightData.enabled = True
     tmrPosUpdates.enabled = True
     tmrFlightTime.enabled = True
 End Sub
@@ -2032,7 +2054,7 @@ Sub StartFlight()
         'Wait for connection results.
         Do
             DoEvents
-            Sleep 50
+            Sleep 75
             If config.ACARSConnected Then Exit Do
         Loop While True
 
@@ -2049,7 +2071,7 @@ Sub StartFlight()
 
     'If we're connected to the ACARS server, send a flight info message.
     If config.ACARSConnected Then
-        SendFlightInfo info
+        info.InfoReqID = SendFlightInfo(info)
         ReqStack.Send
         
         'Wait for the ACK and the Flight ID
@@ -2078,9 +2100,6 @@ Sub StartFlight()
     LockFlightInfo False
     cmdPIREP.visible = True
     cmdPIREP.enabled = False
-    
-    'Allow us to save flight state
-    mnuSaveFlightData.enabled = True
 End Sub
 
 Private Sub mnuSystrayRestore_Click()
@@ -2248,10 +2267,13 @@ Private Sub tmrPing_Timer()
     End If
 End Sub
 
+Private Sub txtAirportA_Change()
+    LimitLength txtAirportA, 4, True
+End Sub
+
 Private Sub txtAirportA_LostFocus()
     Dim ap As Airport
     
-    txtAirportA.Text = UCase(Left(txtAirportA.Text, 4))
     Set ap = config.GetAirport(txtAirportA.Text)
     If Not (ap Is Nothing) Then
         Set info.AirportA = ap
@@ -2261,10 +2283,13 @@ Private Sub txtAirportA_LostFocus()
     End If
 End Sub
 
+Private Sub txtAirportD_Change()
+    LimitLength txtAirportD, 4, True
+End Sub
+
 Private Sub txtAirportD_LostFocus()
     Dim ap As Airport
     
-    txtAirportD.Text = UCase(Left(txtAirportD.Text, 4))
     Set ap = config.GetAirport(txtAirportD.Text)
     If Not (ap Is Nothing) Then
         Set info.airportD = ap
@@ -2274,10 +2299,13 @@ Private Sub txtAirportD_LostFocus()
     End If
 End Sub
 
+Private Sub txtAirportL_Change()
+    LimitLength txtAirportL, 4, True
+End Sub
+
 Private Sub txtAirportL_LostFocus()
     Dim ap As Airport
     
-    txtAirportL.Text = UCase(Left(txtAirportL.Text, 4))
     Set ap = config.GetAirport(txtAirportL.Text)
     If Not (ap Is Nothing) Then
         Set info.AirportL = ap
@@ -2341,21 +2369,27 @@ Private Sub txtCmd_KeyPress(KeyAscii As Integer)
     End If
 End Sub
 
-Private Sub txtCruiseAlt_LostFocus()
-    info.CruiseAltitude = UCase(txtCruiseAlt.Text)
+Private Sub txtCruiseAlt_Change()
+    LimitLength txtCruiseAlt, 5, True
+End Sub
+
+Private Sub txtFlightNumber_Change()
+    LimitLength txtFlightNumber, 7, True
+    info.FlightNumber = txtFlightNumber.Text
 End Sub
 
 Private Sub txtFlightNumber_LostFocus()
-    txtFlightNumber.Text = UCase(txtFlightNumber.Text)
+    info.FlightNumber = txtFlightNumber.Text
 End Sub
 
 Private Sub txtLeg_Change()
-    If (Len(txtLeg.Text) > 1) Then txtLeg.Text = Left(txtLeg.Text, 1)
+    LimitLength txtLeg, 1
     If (InStr(1, "123456", txtLeg.Text) < 1) Then txtLeg.Text = 1
+    info.FlightLeg = CInt(txtLeg.Text)
 End Sub
 
-Private Sub txtPilotID_LostFocus()
-    txtPilotID.Text = UCase(txtPilotID.Text)
+Private Sub txtPilotID_Change()
+    LimitLength txtPilotID, 8, True
 End Sub
 
 Private Sub txtRemarks_Change()
@@ -2381,14 +2415,14 @@ Private Sub wsckMain_Connect()
     tmrPing.enabled = True
     cmdConnectDisconnect.Caption = "Disconnect"
     mnuConnect.Caption = "Disconnect"
-    sbMain.Panels(1).Text = "Status: Connected to ACARS server"
+    sbMain.Panels(1).Text = "Status: Connected"
     
     'Log in
     info.AuthReqID = SendCredentials(frmMain.txtPilotID.Text, frmMain.txtPassword.Text)
     ReqStack.Send
     
     'Wait for an ACK
-    If Not WaitForACK(info.AuthReqID, 5500) Then
+    If Not WaitForACK(info.AuthReqID, 5750) Then
         If (info.AuthReqID <> 0) Then
             info.AuthReqID = 0 'Discard the ACK if it comes back
             MsgBox "ACARS Authentication timed out!", vbOKOnly + vbCritical, "Timed Out"
@@ -2397,6 +2431,7 @@ Private Sub wsckMain_Connect()
         If config.ACARSConnected Then ToggleACARSConnection True
     Else
         cmdConnectDisconnect.enabled = True
+        sbMain.Panels(1).Text = "Status: Connected to ACARS server"
     End If
 End Sub
 
@@ -2404,7 +2439,6 @@ Private Sub wsckMain_DataArrival(ByVal bytesTotal As Long)
     Dim strData As String
     wsckMain.GetData strData, vbString
     ProcessServerData strData
-    DoEvents
 End Sub
 
 Private Sub wsckMain_Error(ByVal Number As Integer, Description As String, ByVal Scode As Long, ByVal Source As String, ByVal HelpFile As String, ByVal HelpContext As Long, CancelDisplay As Boolean)
@@ -2695,6 +2729,19 @@ Private Sub ProcessUserCmd(strInput As String)
             RequestDraftPIREPs
             ReqStack.Send
             
+        Case "atc"
+            If Not config.ACARSConnected Then
+                ShowMessage "Not Connected to ACARS Server", ACARSERRORCOLOR
+                Exit Sub
+            ElseIf (info.Network = "Offline") Then
+                ShowMessage "Not Connected to ATC Network", ACARSERRORCOLOR
+                Exit Sub
+            End If
+            
+            'Request ATC info
+            RequestATCInfo (info.Network)
+            ReqStack.Send
+            
         Case "progress"
             Dim AirportC As Airport
             Dim distanceD As Integer, distanceA As Integer, distanceL As Integer
@@ -2714,8 +2761,8 @@ Private Sub ProcessUserCmd(strInput As String)
             distanceD = info.airportD.DistanceTo(pos.Latitude, pos.Longitude)
             distanceA = info.AirportA.DistanceTo(pos.Latitude, pos.Longitude)
             distanceC = AirportC.DistanceTo(pos.Latitude, pos.Longitude)
-            timeToA = CLng((distanceA * 60) / pos.GroundSpeed) 'Minutes
-            timeToC = CLng((distanceC * 60) / pos.GroundSpeed)
+            timeToA = (distanceA * 60&) / pos.GroundSpeed    'Minutes
+            timeToC = (distanceC * 60&) / pos.GroundSpeed
             
             'Display distance
             ShowMessage "Distance from " & info.airportD.Name & ": " & CStr(distanceD) & " miles", ACARSTEXTCOLOR
@@ -2727,7 +2774,7 @@ Private Sub ProcessUserCmd(strInput As String)
             'Display alternate info
             If Not (info.AirportL Is Nothing) Then
                 distanceL = info.AirportL.DistanceTo(pos.Latitude, pos.Longitude)
-                timeToL = CLng((distanceL * 60) / pos.GroundSpeed)
+                timeToL = (distanceL * 60&) / pos.GroundSpeed
                 ShowMessage "Distance to " & info.AirportL.Name & ": " & CStr(distanceL) & _
                     " miles (" & CStr(timeToL) & " minutes)", ACARSTEXTCOLOR
             End If
@@ -2753,6 +2800,9 @@ Private Sub ProcessUserCmd(strInput As String)
                 Else
                     ShowMessage ".draft - Display draft Flight Reports", ACARSTEXTCOLOR
                 End If
+                
+                If (info.Network <> "Offline") Then ShowMessage ".atc - Request " & info.Network & _
+                    " ATC Information", ACARSTEXTCOLOR
             End If
             
             'Show command requiring active flight
@@ -2797,4 +2847,12 @@ End Sub
 Private Sub LockUserInfo(IsEditable As Boolean)
     txtPilotID.enabled = IsEditable
     txtPassword.enabled = IsEditable
+End Sub
+
+Private Sub LimitLength(txt As TextBox, ByVal maxLen As Integer, Optional doUpperCase As Boolean = False)
+    If (Len(txt.Text) > maxLen) Then txt.Text = Left(txt.Text, maxLen)
+    If (doUpperCase And (UCase(txt.Text) <> txt.Text)) Then
+        txt.Text = UCase(txt.Text)
+        txt.SelStart = Len(txt.Text)
+    End If
 End Sub

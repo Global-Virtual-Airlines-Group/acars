@@ -530,7 +530,7 @@ Public Sub SaveFlight()
     Dim ctlCodes As Variant, fsCtls() As FSCONTROL
     
     'Only save on FS9
-    If (info.FSVersion < 7) Then Exit Sub
+    If Not config.FSUIPCConnected Or (info.FSVersion < 7) Then Exit Sub
 
     'Determine the file name
     fName = "ACARS Flight " + SavedFlightID(info) + Chr(0)
