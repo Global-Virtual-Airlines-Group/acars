@@ -1,25 +1,24 @@
 Attribute VB_Name = "RequestReceiver"
 Option Explicit
 
-Private LastID As Long
+Public ACKStack As New ACKBuffer
 Public Const XMLRESPONSEROOT = "ACARSResponse"
 
-Public Function WaitForACK(ByRef ID As Long, Optional ByVal TimeOut As Integer = 2500) As Boolean
-    Dim totalTime As Integer
+Public Function WaitForACK(ByVal ID As Long, Optional ByVal TimeOut As Long = 2500) As Boolean
+    Dim gotACK As Boolean
+    Dim totalTime As Long
     
-    While (totalTime < TimeOut)
-        If (LastID = ID) Then
-            WaitForACK = True
-            Exit Function
-        ElseIf (ID = 0) Then
-            WaitForACK = True
-            Exit Function
+    ACKStack.Queue ID
+    While (totalTime < TimeOut) And Not gotACK
+        gotACK = ACKStack.HasReceived(ID)
+        If Not gotACK Then
+            totalTime = totalTime + 100
+            Sleep 100
+            DoEvents
         End If
-        
-        totalTime = totalTime + 50
-        Sleep 50
-        DoEvents
     Wend
+    
+    WaitForACK = gotACK
 End Function
 
 Public Sub ProcessMessage(ByVal msgText As String)
@@ -66,8 +65,6 @@ Public Sub ProcessMessage(ByVal msgText As String)
                     info.AuthReqID = 0
                     frmMain.CloseACARSConnection False
                     MsgBox "The following error occurred while attempting to connect to the ACARS server:" & vbCrLf & vbCrLf & getChild(cmd, "error", "?"), vbOKOnly Or vbExclamation, "Error"
-                Case info.PIREPReqID
-                    MsgBox "The following error occurred while attempting to file the Flight Report:" & vbCrLf & vbCrLf & getChild(cmd, "error", "?"), vbOKOnly Or vbExclamation, "Error"
                 Case Else
                     MsgBox "The following error occurred:" & vbCrLf & vbCrLf & getChild(cmd, "error", "?"), vbOKOnly Or vbExclamation, "Error"
             End Select
@@ -79,7 +76,7 @@ Private Sub ProcessResponse(cmd As IXMLDOMNode)
     Dim cmdName As String
     
     'Set critical error handler
-    'On Error GoTo ErrorHandler
+    On Error GoTo ErrorHandler
     
     'Branch depending on type of command.
     cmdName = LCase(getAttr(cmd, "type", ""))
@@ -109,16 +106,16 @@ Private Sub ProcessACK(cmdNode As IXMLDOMNode)
     Dim RequestInfo As Boolean
     
     ReqID = Val("&H" + getAttr(cmdNode, "id", "0"))
-    If (ReqID = LastID) Then Exit Sub
+    If ACKStack.HasReceived(ReqID) Then Exit Sub
     
     If config.ShowDebug Then ShowMessage "Received ACK for " + Hex(ReqID), DEBUGTEXTCOLOR
-    LastID = ReqID
+    ACKStack.Receive ReqID
     
     'Check if we are requesting flight information
     RequestInfo = CBool(getChild(cmdNode, "sendInfo", "false"))
     If RequestInfo Then
         ShowMessage "Requesting Flight Information", ACARSTEXTCOLOR
-        SendFlightInfo info
+        info.InfoReqID = SendFlightInfo(info)
         ReqStack.Send
     End If
             
@@ -170,10 +167,10 @@ Private Sub ProcessACK(cmdNode As IXMLDOMNode)
         
         If config.SB3Support Then RequestPrivateVoiceURL
         RequestPilotList
-        If info.InFlight Or info.FlightData Then SendFlightInfo info
+        If (info.InFlight Or info.FlightData) Then info.InfoReqID = SendFlightInfo(info)
         ReqStack.Send
         DoEvents
-    ElseIf ReqID = info.InfoReqID Then
+    ElseIf (ReqID = info.InfoReqID) Then
         Dim newID As Long
         Dim isCheckRide As Boolean
     
@@ -198,24 +195,20 @@ Private Sub ProcessACK(cmdNode As IXMLDOMNode)
 
         'Save the flight ID to the registry for crash recovery.
         info.FlightID = newID
-        info.CheckRide = isCheckRide
         If isCheckRide Then
+            info.CheckRide = True
             frmMain.chkCheckRide.value = 1
             ShowMessage "ACARS Check Ride detected", SYSMSGCOLOR
-            PlaySoundFile "notify_newversion.wav"
+        ElseIf info.CheckRide And Not isCheckRide Then
+            info.CheckRide = False
+            frmMain.chkCheckRide.value = 0
+            MsgBox "You do not currently have a pending Check Ride in the " & info.EquipmentType & _
+                ".", vbExclamation + vbOKOnly, "No Pending Check Ride"
         End If
             
         config.SaveFlightCode SavedFlightID(info)
         PersistFlightData True
         SaveFlight
-    ElseIf ReqID = info.PIREPReqID Then
-        Set info = New FlightData
-        config.UpdateFlightInfo
-        frmMain.cmdPIREP.visible = False
-        frmMain.cmdPIREP.enabled = False
-        frmMain.progressLabel.visible = False
-        frmMain.PositionProgress.visible = False
-        MsgBox "Flight Report filed Successfully.", vbInformation + vbOKOnly, "Flight Report Filed"
     End If
 End Sub
 
@@ -316,8 +309,8 @@ Private Sub ProcessDataResponse(cmdNode As IXMLDOMNode)
                     p.LastName = getChild(pNode, "lastname", "")
                     p.EquipmentType = getChild(pNode, "eqtype", "CRJ-200")
                     p.Rank = getChild(pNode, "rank", "First Officer")
-                    p.Legs = CInt(getChild(pNode, "legs", "0"))
-                    p.Hours = CDbl(getChild(pNode, "hours", "0"))
+                    p.Legs = CInt(Replace(getChild(pNode, "legs", "0"), ".", config.DecimalSeparator))
+                    p.Hours = CDbl(Replace(getChild(pNode, "hours", "0"), ".", config.DecimalSeparator))
                     p.flightCode = getChild(pNode, "flightCode", "")
                     p.FlightEQ = getChild(pNode, "flightEQ", "")
                     Set p.airportD = config.GetAirport(getChild(pNode, "airportD", ""))
@@ -361,8 +354,8 @@ Private Sub ProcessDataResponse(cmdNode As IXMLDOMNode)
                     p.LastName = getChild(pNode, "lastname", "")
                     p.EquipmentType = getChild(pNode, "eqtype", "CRJ-200")
                     p.Rank = getChild(pNode, "rank", "First Officer")
-                    p.Legs = CInt(getChild(pNode, "legs", "0"))
-                    p.Hours = CDbl(getChild(pNode, "hours", "0"))
+                    p.Legs = CInt(Replace(getChild(pNode, "legs", "0"), ".", config.DecimalSeparator))
+                    p.Hours = CDbl(Replace(getChild(pNode, "hours", "0"), ".", config.DecimalSeparator))
                     p.flightCode = getChild(pNode, "flightCode", "")
                     p.FlightEQ = getChild(pNode, "flightEQ", "")
                     Set p.airportD = config.GetAirport(getChild(pNode, "airportD", ""))
