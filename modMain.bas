@@ -362,6 +362,9 @@ Public Sub FSError(ByVal errCode As Integer)
     'If we're not flying then don't sweat it
     If Not info.InFlight Then Exit Sub
     
+    'Check if FS is still running
+    doCancel = Not IsFSRunning()
+    
     'Prompt for reconnect
     While Not doCancel
         doCancel = (MsgBox("The following error occurred:" & vbCrLf & vbCrLf & _

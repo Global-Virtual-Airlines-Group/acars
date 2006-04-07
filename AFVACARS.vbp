@@ -57,7 +57,7 @@ Description="ACARS client for Aviation Français Virtuel pilots"
 CompatibleMode="0"
 MajorVer=1
 MinorVer=2
-RevisionVer=65
+RevisionVer=66
 AutoIncrementVer=0
 ServerSupportFiles=0
 VersionComments="FSUIPC Key = O7K11GQHV9D7"

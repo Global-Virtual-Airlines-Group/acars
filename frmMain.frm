@@ -169,11 +169,12 @@ Begin VB.Form frmMain
       TabOrientation  =   1
       Style           =   1
       Tabs            =   5
+      Tab             =   1
       TabsPerRow      =   5
       TabHeight       =   529
       TabCaption(0)   =   "ACARS Messages"
       TabPicture(0)   =   "frmMain.frx":000C
-      Tab(0).ControlEnabled=   -1  'True
+      Tab(0).ControlEnabled=   0   'False
       Tab(0).Control(0)=   "rtfText"
       Tab(0).Control(0).Enabled=   0   'False
       Tab(0).Control(1)=   "cmdSend"
@@ -183,7 +184,7 @@ Begin VB.Form frmMain
       Tab(0).ControlCount=   3
       TabCaption(1)   =   "Connected Pilots"
       TabPicture(1)   =   "frmMain.frx":0028
-      Tab(1).ControlEnabled=   0   'False
+      Tab(1).ControlEnabled=   -1  'True
       Tab(1).Control(0)=   "lstPilots"
       Tab(1).Control(0).Enabled=   0   'False
       Tab(1).Control(1)=   "infoFrame"
@@ -196,11 +197,11 @@ Begin VB.Form frmMain
       TabCaption(2)   =   "Air Traffic Control"
       TabPicture(2)   =   "frmMain.frx":0044
       Tab(2).ControlEnabled=   0   'False
-      Tab(2).Control(0)=   "lstATC"
+      Tab(2).Control(0)=   "radioFrame"
       Tab(2).Control(0).Enabled=   0   'False
       Tab(2).Control(1)=   "ctrFrame"
       Tab(2).Control(1).Enabled=   0   'False
-      Tab(2).Control(2)=   "radioFrame"
+      Tab(2).Control(2)=   "lstATC"
       Tab(2).Control(2).Enabled=   0   'False
       Tab(2).ControlCount=   3
       TabCaption(3)   =   "XML Message Data"
@@ -216,7 +217,7 @@ Begin VB.Form frmMain
       Begin VB.CommandButton cmdBusy 
          Caption         =   "I'm Busy"
          Height          =   255
-         Left            =   -70920
+         Left            =   4080
          TabIndex        =   87
          TabStop         =   0   'False
          Top             =   3000
@@ -233,6 +234,7 @@ Begin VB.Form frmMain
          _ExtentY        =   5530
          _Version        =   393217
          BorderStyle     =   0
+         Enabled         =   -1  'True
          ReadOnly        =   -1  'True
          ScrollBars      =   2
          TextRTF         =   $"frmMain.frx":0098
@@ -508,7 +510,7 @@ Begin VB.Form frmMain
       Begin VB.CommandButton cmdUpdatePilotList 
          Caption         =   "Update Connected Pilot List"
          Height          =   270
-         Left            =   -69000
+         Left            =   6000
          TabIndex        =   33
          TabStop         =   0   'False
          Top             =   3000
@@ -526,7 +528,7 @@ Begin VB.Form frmMain
       Begin VB.Frame infoFrame 
          Caption         =   "Pilot Information"
          Height          =   2595
-         Left            =   -70920
+         Left            =   4080
          TabIndex        =   31
          Top             =   240
          Width           =   4935
@@ -735,7 +737,7 @@ Begin VB.Form frmMain
       Begin VB.ListBox lstPilots 
          ForeColor       =   &H00800000&
          Height          =   3180
-         Left            =   -74880
+         Left            =   120
          Sorted          =   -1  'True
          TabIndex        =   30
          Top             =   120
@@ -743,7 +745,7 @@ Begin VB.Form frmMain
       End
       Begin VB.TextBox txtCmd 
          Height          =   285
-         Left            =   120
+         Left            =   -74880
          TabIndex        =   18
          Top             =   3000
          Width           =   7965
@@ -751,7 +753,7 @@ Begin VB.Form frmMain
       Begin VB.CommandButton cmdSend 
          Caption         =   "SEND"
          Height          =   285
-         Left            =   8160
+         Left            =   -66840
          TabIndex        =   19
          Top             =   3000
          Width           =   930
@@ -759,7 +761,7 @@ Begin VB.Form frmMain
       Begin RichTextLib.RichTextBox rtfText 
          CausesValidation=   0   'False
          Height          =   2800
-         Left            =   120
+         Left            =   -74880
          TabIndex        =   0
          TabStop         =   0   'False
          Top             =   120
@@ -768,6 +770,7 @@ Begin VB.Form frmMain
          _ExtentY        =   4948
          _Version        =   393217
          BorderStyle     =   0
+         Enabled         =   -1  'True
          ReadOnly        =   -1  'True
          ScrollBars      =   2
          OLEDragMode     =   0
@@ -1580,6 +1583,7 @@ Private Sub lstPilots_Click()
         pilotInfoFlightCode.Caption = p.flightCode
         pilotInfoEqType.visible = True
         pilotInfoEqType.Caption = p.FlightEQ
+        lblBusy.visible = p.IsBusy
         If Not ((p.AirportA Is Nothing) Or (p.airportD Is Nothing)) Then
             Label22.visible = True
             pilotInfoRoute.visible = True

@@ -97,7 +97,7 @@ Sub StartFlight(Optional isOnline As Boolean = True)
     PIREPFiled = False
     Offline = Not isOnline
     FlightPhase = PREFLIGHT
-    If (Year(StartTime.LocalTime) < 2004) Then StartTime.LocalTime = Now
+    StartTime.LocalTime = Now
 End Sub
 
 Property Get PhaseName() As String
