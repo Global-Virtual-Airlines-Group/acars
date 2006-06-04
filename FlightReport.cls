@@ -13,7 +13,8 @@ Attribute VB_PredeclaredId = False
 Attribute VB_Exposed = False
 Option Explicit
 
-Public flightCode As String
+Public Airline As Airline
+Public FlightNumber As Integer
 Public Leg As Byte
 Public EquipmentType As String
 Public Network As String
@@ -25,8 +26,8 @@ Public AirportA As Airport
 Property Get Description() As String
     If ((airportD Is Nothing) Or (AirportA Is Nothing)) Then Exit Property
     
-    Description = airportD.Name + " (" + airportD.ICAO + ") - " + _
-        AirportA.Name + " (" + AirportA.ICAO + ")"
+    Description = airportD.name + " (" + airportD.ICAO + ") - " + _
+        AirportA.name + " (" + AirportA.ICAO + ")"
 End Property
 
 Private Sub Class_Initialize()

@@ -18,9 +18,10 @@ Public FlightID As Long
 Public CheckRide As Boolean
 
 Public EquipmentType As String
-Public FlightNumber As String
+Public FlightNumber As Integer
 Public FlightLeg As Integer
 Public CruiseAltitude As String
+Public Airline As Airline
 Public AirportA As Airport
 Public airportD As Airport
 Public AirportL As Airport
@@ -42,7 +43,6 @@ Private Time4X As Long
 'Track request numbers for special messages
 Private Auth_ReqID As Long
 Private Info_ReqID As Long
-'Private PIREP_ReqID As Long
 
 'Flight Start Data
 Public StartTime As New UTCDate
@@ -88,6 +88,7 @@ Sub Class_Initialize()
     FlightData = False
     PIREPFiled = False
     Offline = False
+    Set Airline = New Airline
 End Sub
 
 'Start a new flight
@@ -103,6 +104,18 @@ End Sub
 Property Get PhaseName() As String
     If ((FlightPhase < 0) Or (FlightPhase > UBound(PhaseNames))) Then FlightPhase = 0
     PhaseName = PhaseNames(FlightPhase)
+End Property
+
+Property Get flightCode() As String
+    Dim fCode As String
+    
+    If (Airline Is Nothing) Then
+        fCode = "DAL"
+    Else
+        fCode = Airline.code
+    End If
+    
+    flightCode = fCode + CStr(FlightNumber)
 End Property
 
 'Updates flight time

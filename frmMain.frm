@@ -22,12 +22,19 @@ Begin VB.Form frmMain
    EndProperty
    Icon            =   "frmMain.frx":0000
    LinkTopic       =   "Form1"
+   LockControls    =   -1  'True
    MaxButton       =   0   'False
    ScaleHeight     =   8715
    ScaleWidth      =   9420
    StartUpPosition =   3  'Windows Default
    Visible         =   0   'False
    WhatsThisHelp   =   -1  'True
+   Begin VB.Timer tmrStartCheck 
+      Enabled         =   0   'False
+      Interval        =   500
+      Left            =   8640
+      Top             =   3240
+   End
    Begin MSComDlg.CommonDialog CommonDialog1 
       Left            =   8160
       Top             =   3240
@@ -49,6 +56,7 @@ Begin VB.Form frmMain
       Top             =   3720
    End
    Begin VB.Timer tmrPosUpdates 
+      Enabled         =   0   'False
       Interval        =   200
       Left            =   8160
       Top             =   3720
@@ -73,7 +81,7 @@ Begin VB.Form frmMain
       EndProperty
       Height          =   345
       Left            =   8140
-      TabIndex        =   25
+      TabIndex        =   26
       TabStop         =   0   'False
       Top             =   215
       Width           =   1235
@@ -82,7 +90,7 @@ Begin VB.Form frmMain
       Align           =   2  'Align Bottom
       Height          =   300
       Left            =   0
-      TabIndex        =   28
+      TabIndex        =   29
       Top             =   8415
       Width           =   9420
       _ExtentX        =   16616
@@ -141,7 +149,7 @@ Begin VB.Form frmMain
       Enabled         =   0   'False
       Height          =   345
       Left            =   8140
-      TabIndex        =   27
+      TabIndex        =   28
       TabStop         =   0   'False
       Top             =   970
       Visible         =   0   'False
@@ -151,7 +159,7 @@ Begin VB.Form frmMain
       Caption         =   "Start Flight"
       Height          =   345
       Left            =   8140
-      TabIndex        =   26
+      TabIndex        =   27
       TabStop         =   0   'False
       Top             =   595
       Width           =   1235
@@ -160,7 +168,7 @@ Begin VB.Form frmMain
       CausesValidation=   0   'False
       Height          =   3720
       Left            =   120
-      TabIndex        =   29
+      TabIndex        =   30
       Top             =   4680
       Width           =   9195
       _ExtentX        =   16219
@@ -168,9 +176,9 @@ Begin VB.Form frmMain
       _Version        =   393216
       TabOrientation  =   1
       Style           =   1
-      Tabs            =   5
-      Tab             =   1
-      TabsPerRow      =   5
+      Tabs            =   4
+      Tab             =   2
+      TabsPerRow      =   4
       TabHeight       =   529
       TabCaption(0)   =   "ACARS Messages"
       TabPicture(0)   =   "frmMain.frx":000C
@@ -184,41 +192,34 @@ Begin VB.Form frmMain
       Tab(0).ControlCount=   3
       TabCaption(1)   =   "Connected Pilots"
       TabPicture(1)   =   "frmMain.frx":0028
-      Tab(1).ControlEnabled=   -1  'True
-      Tab(1).Control(0)=   "lstPilots"
+      Tab(1).ControlEnabled=   0   'False
+      Tab(1).Control(0)=   "cmdBusy"
       Tab(1).Control(0).Enabled=   0   'False
-      Tab(1).Control(1)=   "infoFrame"
+      Tab(1).Control(1)=   "cmdUpdatePilotList"
       Tab(1).Control(1).Enabled=   0   'False
-      Tab(1).Control(2)=   "cmdUpdatePilotList"
-      Tab(1).Control(2).Enabled=   0   'False
-      Tab(1).Control(3)=   "cmdBusy"
-      Tab(1).Control(3).Enabled=   0   'False
+      Tab(1).Control(2)=   "infoFrame"
+      Tab(1).Control(3)=   "lstPilots"
       Tab(1).ControlCount=   4
       TabCaption(2)   =   "Air Traffic Control"
       TabPicture(2)   =   "frmMain.frx":0044
-      Tab(2).ControlEnabled=   0   'False
-      Tab(2).Control(0)=   "radioFrame"
+      Tab(2).ControlEnabled=   -1  'True
+      Tab(2).Control(0)=   "lstATC"
       Tab(2).Control(0).Enabled=   0   'False
       Tab(2).Control(1)=   "ctrFrame"
       Tab(2).Control(1).Enabled=   0   'False
-      Tab(2).Control(2)=   "lstATC"
+      Tab(2).Control(2)=   "radioFrame"
       Tab(2).Control(2).Enabled=   0   'False
       Tab(2).ControlCount=   3
       TabCaption(3)   =   "XML Message Data"
       TabPicture(3)   =   "frmMain.frx":0060
       Tab(3).ControlEnabled=   0   'False
       Tab(3).Control(0)=   "rtfDebug"
-      Tab(3).Control(0).Enabled=   0   'False
       Tab(3).ControlCount=   1
-      TabCaption(4)   =   "TeamSpeak"
-      TabPicture(4)   =   "frmMain.frx":007C
-      Tab(4).ControlEnabled=   0   'False
-      Tab(4).ControlCount=   0
       Begin VB.CommandButton cmdBusy 
          Caption         =   "I'm Busy"
          Height          =   255
-         Left            =   4080
-         TabIndex        =   87
+         Left            =   -70920
+         TabIndex        =   88
          TabStop         =   0   'False
          Top             =   3000
          Width           =   1815
@@ -226,7 +227,7 @@ Begin VB.Form frmMain
       Begin RichTextLib.RichTextBox rtfDebug 
          Height          =   3135
          Left            =   -74880
-         TabIndex        =   71
+         TabIndex        =   72
          TabStop         =   0   'False
          Top             =   120
          Width           =   8895
@@ -234,23 +235,22 @@ Begin VB.Form frmMain
          _ExtentY        =   5530
          _Version        =   393217
          BorderStyle     =   0
-         Enabled         =   -1  'True
          ReadOnly        =   -1  'True
          ScrollBars      =   2
-         TextRTF         =   $"frmMain.frx":0098
+         TextRTF         =   $"frmMain.frx":007C
       End
       Begin VB.Frame radioFrame 
          Caption         =   "Communication Radio Frequencies"
          Height          =   1575
-         Left            =   -70560
-         TabIndex        =   45
+         Left            =   4440
+         TabIndex        =   46
          Top             =   1695
          Width           =   4620
          Begin VB.CommandButton cmdSetAPP 
             Caption         =   "Set to xxx.xx"
             Height          =   290
             Left            =   3070
-            TabIndex        =   69
+            TabIndex        =   70
             TabStop         =   0   'False
             Top             =   1230
             Width           =   1350
@@ -259,7 +259,7 @@ Begin VB.Form frmMain
             Caption         =   "Set to xxx.xx"
             Height          =   290
             Left            =   3070
-            TabIndex        =   68
+            TabIndex        =   69
             TabStop         =   0   'False
             Top             =   910
             Width           =   1350
@@ -268,7 +268,7 @@ Begin VB.Form frmMain
             Caption         =   "Set to xxx.xx"
             Height          =   290
             Left            =   3070
-            TabIndex        =   67
+            TabIndex        =   68
             TabStop         =   0   'False
             Top             =   590
             Width           =   1350
@@ -277,7 +277,7 @@ Begin VB.Form frmMain
             Caption         =   "Set to xxx.xx"
             Height          =   290
             Left            =   3070
-            TabIndex        =   66
+            TabIndex        =   67
             TabStop         =   0   'False
             Top             =   270
             Width           =   1350
@@ -286,7 +286,7 @@ Begin VB.Form frmMain
             Caption         =   "Set COM1"
             Height          =   290
             Left            =   2040
-            TabIndex        =   61
+            TabIndex        =   62
             TabStop         =   0   'False
             Top             =   1230
             Width           =   900
@@ -295,7 +295,7 @@ Begin VB.Form frmMain
             Caption         =   "Set COM1"
             Height          =   290
             Left            =   2040
-            TabIndex        =   60
+            TabIndex        =   61
             TabStop         =   0   'False
             Top             =   910
             Width           =   900
@@ -304,7 +304,7 @@ Begin VB.Form frmMain
             Caption         =   "Set COM1"
             Height          =   290
             Left            =   2040
-            TabIndex        =   59
+            TabIndex        =   60
             TabStop         =   0   'False
             Top             =   590
             Width           =   900
@@ -313,7 +313,7 @@ Begin VB.Form frmMain
             Caption         =   "Set COM1"
             Height          =   290
             Left            =   2040
-            TabIndex        =   58
+            TabIndex        =   59
             TabStop         =   0   'False
             Top             =   270
             Width           =   900
@@ -321,7 +321,7 @@ Begin VB.Form frmMain
          Begin VB.TextBox txtAPPfreq 
             Height          =   290
             Left            =   1200
-            TabIndex        =   57
+            TabIndex        =   58
             TabStop         =   0   'False
             Top             =   1220
             Width           =   700
@@ -329,7 +329,7 @@ Begin VB.Form frmMain
          Begin VB.TextBox txtCTRfreq 
             Height          =   290
             Left            =   1200
-            TabIndex        =   56
+            TabIndex        =   57
             TabStop         =   0   'False
             Top             =   900
             Width           =   700
@@ -337,7 +337,7 @@ Begin VB.Form frmMain
          Begin VB.TextBox txtDEPfreq 
             Height          =   290
             Left            =   1200
-            TabIndex        =   55
+            TabIndex        =   56
             TabStop         =   0   'False
             Top             =   590
             Width           =   700
@@ -345,7 +345,7 @@ Begin VB.Form frmMain
          Begin VB.TextBox txtGNDfreq 
             Height          =   290
             Left            =   1200
-            TabIndex        =   54
+            TabIndex        =   55
             TabStop         =   0   'False
             Top             =   270
             Width           =   700
@@ -355,7 +355,7 @@ Begin VB.Form frmMain
             Caption         =   "Approach"
             Height          =   255
             Left            =   120
-            TabIndex        =   49
+            TabIndex        =   50
             Top             =   1240
             Width           =   1035
          End
@@ -364,7 +364,7 @@ Begin VB.Form frmMain
             Caption         =   "Center"
             Height          =   255
             Left            =   120
-            TabIndex        =   48
+            TabIndex        =   49
             Top             =   940
             Width           =   1030
          End
@@ -373,7 +373,7 @@ Begin VB.Form frmMain
             Caption         =   "Departure"
             Height          =   255
             Left            =   120
-            TabIndex        =   47
+            TabIndex        =   48
             Top             =   620
             Width           =   1030
          End
@@ -382,7 +382,7 @@ Begin VB.Form frmMain
             Caption         =   "Ground/Tower"
             Height          =   255
             Left            =   120
-            TabIndex        =   46
+            TabIndex        =   47
             Top             =   330
             Width           =   1030
          End
@@ -390,8 +390,8 @@ Begin VB.Form frmMain
       Begin VB.Frame ctrFrame 
          Caption         =   "Controller Information"
          Height          =   1545
-         Left            =   -70560
-         TabIndex        =   44
+         Left            =   4440
+         TabIndex        =   45
          Top             =   90
          Visible         =   0   'False
          Width           =   4620
@@ -399,7 +399,7 @@ Begin VB.Form frmMain
             Caption         =   "Update Air Traffic Control List"
             Height          =   270
             Left            =   840
-            TabIndex        =   70
+            TabIndex        =   71
             TabStop         =   0   'False
             Top             =   1200
             Width           =   3015
@@ -421,7 +421,7 @@ Begin VB.Form frmMain
             ForeColor       =   &H80000008&
             Height          =   255
             Left            =   3480
-            TabIndex        =   65
+            TabIndex        =   66
             Top             =   900
             Width           =   735
          End
@@ -433,7 +433,7 @@ Begin VB.Form frmMain
             ForeColor       =   &H80000008&
             Height          =   255
             Left            =   1080
-            TabIndex        =   64
+            TabIndex        =   65
             Top             =   900
             Width           =   1335
          End
@@ -445,7 +445,7 @@ Begin VB.Form frmMain
             ForeColor       =   &H00808000&
             Height          =   255
             Left            =   1080
-            TabIndex        =   63
+            TabIndex        =   64
             Top             =   600
             Width           =   3135
          End
@@ -466,7 +466,7 @@ Begin VB.Form frmMain
             ForeColor       =   &H80000008&
             Height          =   255
             Left            =   1080
-            TabIndex        =   62
+            TabIndex        =   63
             Top             =   285
             Width           =   3135
          End
@@ -475,7 +475,7 @@ Begin VB.Form frmMain
             Caption         =   "Frequency"
             Height          =   255
             Left            =   2520
-            TabIndex        =   53
+            TabIndex        =   54
             Top             =   900
             Width           =   855
          End
@@ -484,7 +484,7 @@ Begin VB.Form frmMain
             Caption         =   "ATC Rating"
             Height          =   255
             Left            =   120
-            TabIndex        =   52
+            TabIndex        =   53
             Top             =   900
             Width           =   855
          End
@@ -493,7 +493,7 @@ Begin VB.Form frmMain
             Caption         =   "Facility Info"
             Height          =   255
             Left            =   120
-            TabIndex        =   51
+            TabIndex        =   52
             Top             =   615
             Width           =   855
          End
@@ -502,7 +502,7 @@ Begin VB.Form frmMain
             Caption         =   "Name"
             Height          =   255
             Left            =   360
-            TabIndex        =   50
+            TabIndex        =   51
             Top             =   300
             Width           =   615
          End
@@ -510,8 +510,8 @@ Begin VB.Form frmMain
       Begin VB.CommandButton cmdUpdatePilotList 
          Caption         =   "Update Connected Pilot List"
          Height          =   270
-         Left            =   6000
-         TabIndex        =   33
+         Left            =   -69000
+         TabIndex        =   34
          TabStop         =   0   'False
          Top             =   3000
          Width           =   3015
@@ -519,24 +519,24 @@ Begin VB.Form frmMain
       Begin VB.ListBox lstATC 
          ForeColor       =   &H00800000&
          Height          =   3180
-         Left            =   -74880
+         Left            =   120
          Sorted          =   -1  'True
-         TabIndex        =   32
+         TabIndex        =   33
          Top             =   120
          Width           =   4215
       End
       Begin VB.Frame infoFrame 
          Caption         =   "Pilot Information"
          Height          =   2595
-         Left            =   4080
-         TabIndex        =   31
+         Left            =   -70920
+         TabIndex        =   32
          Top             =   240
          Width           =   4935
          Begin VB.CommandButton cmdBan 
             Caption         =   "Disconnect User and Block Address"
             Height          =   255
             Left            =   1920
-            TabIndex        =   73
+            TabIndex        =   74
             TabStop         =   0   'False
             Top             =   2235
             Visible         =   0   'False
@@ -546,7 +546,7 @@ Begin VB.Form frmMain
             Caption         =   "Disconnect User"
             Height          =   255
             Left            =   120
-            TabIndex        =   72
+            TabIndex        =   73
             TabStop         =   0   'False
             Top             =   2235
             Visible         =   0   'False
@@ -557,7 +557,7 @@ Begin VB.Form frmMain
             Caption         =   "Airport (XXXX) - Airport (XXXX)"
             Height          =   495
             Left            =   1080
-            TabIndex        =   90
+            TabIndex        =   91
             Top             =   1395
             Width           =   3615
          End
@@ -576,7 +576,7 @@ Begin VB.Form frmMain
             ForeColor       =   &H00808000&
             Height          =   255
             Left            =   2400
-            TabIndex        =   89
+            TabIndex        =   90
             Top             =   1110
             Width           =   1335
          End
@@ -585,7 +585,7 @@ Begin VB.Form frmMain
             Caption         =   "Flight Route"
             Height          =   255
             Left            =   30
-            TabIndex        =   88
+            TabIndex        =   89
             Top             =   1390
             Width           =   945
          End
@@ -603,7 +603,7 @@ Begin VB.Form frmMain
             ForeColor       =   &H000000FF&
             Height          =   255
             Left            =   3720
-            TabIndex        =   86
+            TabIndex        =   87
             Top             =   270
             Visible         =   0   'False
             Width           =   615
@@ -616,7 +616,7 @@ Begin VB.Form frmMain
             ForeColor       =   &H80000008&
             Height          =   255
             Left            =   1080
-            TabIndex        =   43
+            TabIndex        =   44
             Top             =   1920
             Visible         =   0   'False
             Width           =   3615
@@ -626,7 +626,7 @@ Begin VB.Form frmMain
             Caption         =   "Connected"
             Height          =   255
             Left            =   120
-            TabIndex        =   42
+            TabIndex        =   43
             Top             =   1920
             Visible         =   0   'False
             Width           =   855
@@ -648,7 +648,7 @@ Begin VB.Form frmMain
             ForeColor       =   &H00800000&
             Height          =   255
             Left            =   1080
-            TabIndex        =   41
+            TabIndex        =   42
             Top             =   1110
             Width           =   1095
          End
@@ -657,7 +657,7 @@ Begin VB.Form frmMain
             Caption         =   "Flying"
             Height          =   255
             Left            =   120
-            TabIndex        =   40
+            TabIndex        =   41
             Top             =   1110
             Width           =   855
          End
@@ -669,7 +669,7 @@ Begin VB.Form frmMain
             ForeColor       =   &H80000008&
             Height          =   255
             Left            =   1080
-            TabIndex        =   39
+            TabIndex        =   40
             Top             =   810
             Width           =   1935
          End
@@ -681,7 +681,7 @@ Begin VB.Form frmMain
             ForeColor       =   &H80000008&
             Height          =   255
             Left            =   1080
-            TabIndex        =   38
+            TabIndex        =   39
             Top             =   540
             Width           =   2775
          End
@@ -702,7 +702,7 @@ Begin VB.Form frmMain
             ForeColor       =   &H00800000&
             Height          =   255
             Left            =   1080
-            TabIndex        =   37
+            TabIndex        =   38
             Top             =   250
             Width           =   2415
          End
@@ -711,7 +711,7 @@ Begin VB.Form frmMain
             Caption         =   "Flights"
             Height          =   255
             Left            =   120
-            TabIndex        =   36
+            TabIndex        =   37
             Top             =   810
             Width           =   855
          End
@@ -720,7 +720,7 @@ Begin VB.Form frmMain
             Caption         =   "Rank"
             Height          =   255
             Left            =   240
-            TabIndex        =   35
+            TabIndex        =   36
             Top             =   540
             Width           =   735
          End
@@ -729,7 +729,7 @@ Begin VB.Form frmMain
             Caption         =   "Name"
             Height          =   255
             Left            =   120
-            TabIndex        =   34
+            TabIndex        =   35
             Top             =   260
             Width           =   855
          End
@@ -737,16 +737,16 @@ Begin VB.Form frmMain
       Begin VB.ListBox lstPilots 
          ForeColor       =   &H00800000&
          Height          =   3180
-         Left            =   120
+         Left            =   -74880
          Sorted          =   -1  'True
-         TabIndex        =   30
+         TabIndex        =   31
          Top             =   120
          Width           =   3855
       End
       Begin VB.TextBox txtCmd 
          Height          =   285
          Left            =   -74880
-         TabIndex        =   18
+         TabIndex        =   19
          Top             =   3000
          Width           =   7965
       End
@@ -754,7 +754,7 @@ Begin VB.Form frmMain
          Caption         =   "SEND"
          Height          =   285
          Left            =   -66840
-         TabIndex        =   19
+         TabIndex        =   21
          Top             =   3000
          Width           =   930
       End
@@ -762,7 +762,7 @@ Begin VB.Form frmMain
          CausesValidation=   0   'False
          Height          =   2800
          Left            =   -74880
-         TabIndex        =   0
+         TabIndex        =   18
          TabStop         =   0   'False
          Top             =   120
          Width           =   8955
@@ -770,29 +770,28 @@ Begin VB.Form frmMain
          _ExtentY        =   4948
          _Version        =   393217
          BorderStyle     =   0
-         Enabled         =   -1  'True
          ReadOnly        =   -1  'True
          ScrollBars      =   2
          OLEDragMode     =   0
          OLEDropMode     =   0
-         TextRTF         =   $"frmMain.frx":0113
+         TextRTF         =   $"frmMain.frx":00F7
       End
    End
    Begin VB.Frame authFrame 
       Caption         =   "Pilot Authentication"
       Height          =   720
       Left            =   120
-      TabIndex        =   24
+      TabIndex        =   25
       Top             =   120
       Width           =   7935
       Begin VB.TextBox txtPilotName 
-         BorderStyle     =   0  'None
+         BackColor       =   &H8000000F&
          CausesValidation=   0   'False
          Enabled         =   0   'False
          ForeColor       =   &H00C00000&
          Height          =   285
          Left            =   1200
-         TabIndex        =   22
+         TabIndex        =   0
          TabStop         =   0   'False
          Top             =   265
          Width           =   1575
@@ -809,7 +808,7 @@ Begin VB.Form frmMain
          EndProperty
          Height          =   285
          Left            =   3915
-         TabIndex        =   2
+         TabIndex        =   1
          Top             =   265
          WhatsThisHelpID =   104
          Width           =   950
@@ -828,7 +827,7 @@ Begin VB.Form frmMain
          IMEMode         =   3  'DISABLE
          Left            =   6435
          PasswordChar    =   "*"
-         TabIndex        =   3
+         TabIndex        =   2
          Top             =   265
          Width           =   1090
       End
@@ -837,7 +836,7 @@ Begin VB.Form frmMain
          Caption         =   "Pilot Name:"
          Height          =   255
          Left            =   240
-         TabIndex        =   23
+         TabIndex        =   24
          Top             =   295
          Width           =   855
       End
@@ -846,7 +845,7 @@ Begin VB.Form frmMain
          Caption         =   "Pilot ID:"
          Height          =   255
          Left            =   3195
-         TabIndex        =   21
+         TabIndex        =   23
          Top             =   295
          Width           =   615
       End
@@ -855,7 +854,7 @@ Begin VB.Form frmMain
          Caption         =   "Password:"
          Height          =   255
          Left            =   5460
-         TabIndex        =   20
+         TabIndex        =   22
          Top             =   295
          Width           =   915
       End
@@ -864,9 +863,19 @@ Begin VB.Form frmMain
       Caption         =   "Flight Information"
       Height          =   3615
       Left            =   120
-      TabIndex        =   74
+      TabIndex        =   75
       Top             =   960
       Width           =   7935
+      Begin VB.ComboBox cboAirline 
+         Height          =   315
+         ItemData        =   "frmMain.frx":0172
+         Left            =   1395
+         List            =   "frmMain.frx":0179
+         Style           =   2  'Dropdown List
+         TabIndex        =   3
+         Top             =   240
+         Width           =   2175
+      End
       Begin VB.TextBox txtAirportL 
          Height          =   315
          Left            =   4800
@@ -877,14 +886,14 @@ Begin VB.Form frmMain
       Begin VB.TextBox txtAirportA 
          Height          =   315
          Left            =   4800
-         TabIndex        =   12
+         TabIndex        =   10
          Top             =   960
          Width           =   530
       End
       Begin VB.TextBox txtAirportD 
          Height          =   315
          Left            =   4800
-         TabIndex        =   9
+         TabIndex        =   8
          Top             =   600
          Width           =   530
       End
@@ -906,23 +915,23 @@ Begin VB.Form frmMain
       End
       Begin VB.TextBox txtFlightNumber 
          Height          =   300
-         Left            =   1395
+         Left            =   4120
          TabIndex        =   4
          Top             =   240
-         Width           =   735
+         Width           =   500
       End
       Begin VB.TextBox txtCruiseAlt 
          Height          =   300
          Left            =   6675
-         TabIndex        =   7
-         Top             =   240
+         TabIndex        =   11
+         Top             =   600
          Width           =   1080
       End
       Begin VB.ComboBox cboEquipment 
          Height          =   315
-         ItemData        =   "frmMain.frx":018E
-         Left            =   4040
-         List            =   "frmMain.frx":0190
+         ItemData        =   "frmMain.frx":0189
+         Left            =   6455
+         List            =   "frmMain.frx":018B
          Style           =   2  'Dropdown List
          TabIndex        =   6
          Top             =   240
@@ -931,10 +940,10 @@ Begin VB.Form frmMain
       Begin VB.ComboBox cboAirportD 
          CausesValidation=   0   'False
          Height          =   315
-         ItemData        =   "frmMain.frx":0192
+         ItemData        =   "frmMain.frx":018D
          Left            =   1395
-         List            =   "frmMain.frx":0199
-         TabIndex        =   8
+         List            =   "frmMain.frx":0194
+         TabIndex        =   7
          Text            =   "cboAirportD"
          ToolTipText     =   "This is the Airport you are departing from."
          Top             =   600
@@ -942,10 +951,10 @@ Begin VB.Form frmMain
       End
       Begin VB.ComboBox cboAirportA 
          Height          =   315
-         ItemData        =   "frmMain.frx":01A9
+         ItemData        =   "frmMain.frx":01A4
          Left            =   1395
-         List            =   "frmMain.frx":01B0
-         TabIndex        =   11
+         List            =   "frmMain.frx":01AB
+         TabIndex        =   9
          Text            =   "cboAirportA"
          ToolTipText     =   "This is the Airport you are arriving at."
          Top             =   960
@@ -953,19 +962,19 @@ Begin VB.Form frmMain
       End
       Begin VB.ComboBox cboNetwork 
          Height          =   315
-         ItemData        =   "frmMain.frx":01C0
+         ItemData        =   "frmMain.frx":01BB
          Left            =   6675
-         List            =   "frmMain.frx":01D0
+         List            =   "frmMain.frx":01CB
          Style           =   2  'Dropdown List
-         TabIndex        =   10
-         Top             =   600
+         TabIndex        =   12
+         Top             =   960
          Width           =   1090
       End
       Begin VB.ComboBox cboAirportL 
          Height          =   315
-         ItemData        =   "frmMain.frx":01F0
+         ItemData        =   "frmMain.frx":01EB
          Left            =   1395
-         List            =   "frmMain.frx":01F2
+         List            =   "frmMain.frx":01ED
          TabIndex        =   13
          Text            =   "cboAirportL"
          Top             =   1320
@@ -977,21 +986,21 @@ Begin VB.Form frmMain
          Left            =   5760
          TabIndex        =   15
          TabStop         =   0   'False
-         Top             =   1200
+         Top             =   1360
          Width           =   1800
       End
       Begin VB.TextBox txtLeg 
          Height          =   300
-         Left            =   2640
+         Left            =   5040
          TabIndex        =   5
          Text            =   "1"
          Top             =   240
-         Width           =   290
+         Width           =   280
       End
       Begin MSComctlLib.ProgressBar PositionProgress 
          Height          =   255
          Left            =   3900
-         TabIndex        =   75
+         TabIndex        =   76
          Top             =   3240
          Visible         =   0   'False
          Width           =   3870
@@ -1001,21 +1010,30 @@ Begin VB.Form frmMain
          Appearance      =   1
          Scrolling       =   1
       End
+      Begin VB.Label Label23 
+         Alignment       =   1  'Right Justify
+         Caption         =   "Airline:"
+         Height          =   255
+         Left            =   595
+         TabIndex        =   92
+         Top             =   260
+         Width           =   695
+      End
       Begin VB.Label Label2 
          Alignment       =   1  'Right Justify
-         Caption         =   "Flight Number:"
+         Caption         =   "Flight"
          Height          =   255
-         Left            =   200
-         TabIndex        =   85
+         Left            =   3560
+         TabIndex        =   86
          Top             =   285
-         Width           =   1095
+         Width           =   480
       End
       Begin VB.Label Label4 
          Alignment       =   1  'Right Justify
          Caption         =   "Flight Route:"
          Height          =   255
          Left            =   100
-         TabIndex        =   84
+         TabIndex        =   85
          Top             =   1740
          Width           =   1190
       End
@@ -1024,7 +1042,7 @@ Begin VB.Form frmMain
          Caption         =   "Remarks:"
          Height          =   255
          Left            =   240
-         TabIndex        =   83
+         TabIndex        =   84
          Top             =   2475
          Width           =   1095
       End
@@ -1032,8 +1050,8 @@ Begin VB.Form frmMain
          Alignment       =   1  'Right Justify
          Caption         =   "Equipment:"
          Height          =   255
-         Left            =   3080
-         TabIndex        =   82
+         Left            =   5510
+         TabIndex        =   83
          Top             =   285
          Width           =   855
       End
@@ -1042,8 +1060,8 @@ Begin VB.Form frmMain
          Caption         =   "Cruise Altitude:"
          Height          =   255
          Left            =   5400
-         TabIndex        =   81
-         Top             =   285
+         TabIndex        =   82
+         Top             =   645
          Width           =   1215
       End
       Begin VB.Label Label6 
@@ -1051,7 +1069,7 @@ Begin VB.Form frmMain
          Caption         =   "Arriving at:"
          Height          =   255
          Left            =   195
-         TabIndex        =   80
+         TabIndex        =   81
          Top             =   1005
          Width           =   1095
       End
@@ -1059,16 +1077,16 @@ Begin VB.Form frmMain
          Alignment       =   1  'Right Justify
          Caption         =   "Network:"
          Height          =   255
-         Left            =   5835
-         TabIndex        =   79
-         Top             =   645
+         Left            =   5880
+         TabIndex        =   80
+         Top             =   1005
          Width           =   735
       End
       Begin VB.Label progressLabel 
          Caption         =   "FILING OFFLINE FLIGHT REPORT"
          Height          =   255
          Left            =   1410
-         TabIndex        =   78
+         TabIndex        =   79
          Top             =   3240
          Visible         =   0   'False
          Width           =   2415
@@ -1078,25 +1096,25 @@ Begin VB.Form frmMain
          Caption         =   "Alternate:"
          Height          =   255
          Left            =   195
-         TabIndex        =   77
+         TabIndex        =   78
          Top             =   1380
          Width           =   1095
       End
       Begin VB.Label Label13 
          Alignment       =   1  'Right Justify
-         Caption         =   "Leg:"
+         Caption         =   "Leg"
          Height          =   255
-         Left            =   2205
-         TabIndex        =   1
+         Left            =   4640
+         TabIndex        =   20
          Top             =   285
-         Width           =   375
+         Width           =   345
       End
       Begin VB.Label Label3 
          Alignment       =   1  'Right Justify
          Caption         =   "Departing from:"
          Height          =   255
          Left            =   75
-         TabIndex        =   76
+         TabIndex        =   77
          Top             =   645
          Width           =   1215
       End
@@ -1164,6 +1182,9 @@ Begin VB.Form frmMain
       Begin VB.Menu mnuOptionsShowDebugMessages 
          Caption         =   "Show Debug Messages"
       End
+      Begin VB.Menu mnuOptionsDisableAutoSave 
+         Caption         =   "Disable &Automatic Saves"
+      End
       Begin VB.Menu mnuOptionsSep2 
          Caption         =   "-"
       End
@@ -1171,7 +1192,7 @@ Begin VB.Form frmMain
          Caption         =   "&WideFS Installed"
       End
       Begin VB.Menu mnuOptionsSB3Support 
-         Caption         =   "SquawkBox 3 Integration"
+         Caption         =   "&SquawkBox 3 Integration"
       End
       Begin VB.Menu mnuOptionsTS2Support 
          Caption         =   "&TeamSpeak 2 Integration"
@@ -1231,6 +1252,10 @@ End Sub
 Private Sub cboAirportL_Click()
     Set info.AirportL = config.GetAirportByOfs(cboAirportL.ListIndex - 1)
     If Not (info.AirportL Is Nothing) Then txtAirportL.Text = info.AirportL.ICAO
+End Sub
+
+Private Sub cboAirline_Click()
+    Set info.Airline = config.GetAirlineByOfs(cboAirline.ListIndex - 1)
 End Sub
 
 Private Sub cboEquipment_Click()
@@ -1408,6 +1433,9 @@ Private Sub cmdPIREP_Click()
     cmdPIREP.enabled = False
     progressLabel.visible = False
     PositionProgress.visible = False
+    
+    'Show status messages
+    ShowFSMessage "Flight Report Successfully filed", True, 15
     MsgBox "Flight Report filed Successfully.", vbInformation + vbOKOnly, "Flight Report Filed"
     
 ExitSub:
@@ -1501,8 +1529,10 @@ Private Sub Form_MouseMove(Button As Integer, Shift As Integer, x As Single, y A
     If (WindowState <> vbMinimized) Then Exit Sub
     
     Msg = x / Screen.TwipsPerPixelX
-    If ((Msg = WM_RBUTTONUP) Or (Msg = WM_LBUTTONUP)) Then
-        SetForegroundWindow Me.hwnd
+    If (Msg = WM_LBUTTONDBLCLK) Then
+        Call mnuSystrayRestore_Click
+    ElseIf ((Msg = WM_RBUTTONUP) Or (Msg = WM_LBUTTONUP)) Then
+        SetForegroundWindow Me.hWnd
         PopupMenu mnuTray
     End If
 End Sub
@@ -1514,10 +1544,10 @@ End Sub
 Private Sub Form_Resize()
     If (config.HideWhenMinimized And (WindowState = vbMinimized)) Then
         AddIcon App.CompanyName + " ACARS", frmSplash.Icon
-        TaskBarHide frmMain.hwnd
+        TaskBarHide frmMain.hWnd
     ElseIf (config.HideWhenMinimized And (WindowState = vbNormal)) Then
         RemoveIcon
-        TaskBarShow frmMain.hwnd
+        TaskBarShow frmMain.hWnd
     End If
 End Sub
 
@@ -1551,14 +1581,14 @@ Private Sub lstATC_Click()
     
     'Update the controller info
     users.SelectedATC = ctr.ID
-    atcInfoName.Caption = ctr.Name
+    atcInfoName.Caption = ctr.name
     atcInfoFacility.Caption = ctr.FacilityInfo
     atcInfoRating.Caption = ctr.Rating
     atcInfoFreq.Caption = ctr.Frequency
     ctrFrame.visible = True
     
     'Update buttons
-    UpdateTuneButtons True, True, "Set to " + ctr.Frequency
+    UpdateTuneButtons True, (ctr.Frequency <> "199.998"), "Set to " + ctr.Frequency
 End Sub
 
 Private Sub lstPilots_Click()
@@ -1572,7 +1602,7 @@ Private Sub lstPilots_Click()
     
     'Update the pilot info
     users.SelectedPilot = p.ID
-    pilotInfoName.Caption = p.Name
+    pilotInfoName.Caption = p.name
     pilotInfoRank.Caption = p.Rank + ", " + p.EquipmentType
     pilotInfoFlightData.Caption = p.FlightTotals
     
@@ -1583,12 +1613,11 @@ Private Sub lstPilots_Click()
         pilotInfoFlightCode.Caption = p.flightCode
         pilotInfoEqType.visible = True
         pilotInfoEqType.Caption = p.FlightEQ
-        lblBusy.visible = p.IsBusy
         If Not ((p.AirportA Is Nothing) Or (p.airportD Is Nothing)) Then
             Label22.visible = True
             pilotInfoRoute.visible = True
-            pilotInfoRoute.Caption = p.airportD.Name + " (" + p.airportD.ICAO + ") - " + _
-                p.AirportA.Name + " (" + p.AirportA.ICAO + ")"
+            pilotInfoRoute.Caption = p.airportD.name + " (" + p.airportD.ICAO + ") - " + _
+                p.AirportA.name + " (" + p.AirportA.ICAO + ")"
         Else
             Label22.visible = False
             pilotInfoRoute.visible = False
@@ -1642,16 +1671,8 @@ Public Sub UpdateTuneButtons(visible As Boolean, enabled As Boolean, Optional bt
     Next
 End Sub
 
-Private Sub mnuFlightEndFlight_Click()
-    If info.InFlight Then StopFlight
-End Sub
-
 Private Sub mnuFlightExit_Click()
     Unload frmMain
-End Sub
-
-Private Sub mnuFlightStartFlight_Click()
-    If Not info.InFlight Then StartFlight
 End Sub
 
 Private Sub mnuHelpAbout_Click()
@@ -1661,6 +1682,11 @@ End Sub
 Private Sub mnuOpenFlightPlan_Click()
     FPlan_Open
     config.UpdateFlightInfo
+End Sub
+
+Private Sub mnuOptionsDisableAutoSave_Click()
+    config.DisableAutoSave = Not config.DisableAutoSave
+    config.UpdateSettingsMenu
 End Sub
 
 Private Sub mnuOptionsGaugeIntegration_Click()
@@ -1777,7 +1803,7 @@ Public Function StopFlight(Optional isError As Boolean = False) As Boolean
             
             If (MsgBox("You are " & CStr(distanceD) & " miles away from your Destination." & _
                 vbCrLf & "The closest airport (" & CStr(distance) & " miles away) is " & _
-                AirportA.Name & "." & vbCrLf & vbCrLf & "Update your destination?", _
+                AirportA.name & "." & vbCrLf & vbCrLf & "Update your destination?", _
                 vbYesNo Or vbExclamation, "Update Destination") = vbYes) Then
                 Set info.AirportA = AirportA
                 config.UpdateFlightInfo
@@ -1833,6 +1859,12 @@ Public Function StopFlight(Optional isError As Boolean = False) As Boolean
         cmdPIREP.visible = True
         cmdPIREP.enabled = config.ACARSConnected
         cmdStartStopFlight.enabled = False
+            
+        'If we're connected to the server, ask to file a flight report
+        If config.ACARSConnected Then
+            If (MsgBox("Do you wish to file the Flight Report?", vbInformation + vbYesNo, _
+                "File Flight Report") = vbYes) Then Call cmdPIREP_Click
+        End If
     End If
 End Function
 
@@ -1924,6 +1956,9 @@ End Sub
 Sub StartFlight()
     Dim dwResult As Long
     Dim distance As Integer
+    
+    'Kill the autostart timer
+    tmrStartCheck.enabled = False
 
     If info.InFlight Then
         MsgBox "You already have a flight in progress!", vbOKOnly Or vbExclamation, "Error"
@@ -1931,15 +1966,16 @@ Sub StartFlight()
     End If
     
     'Populate the flight information
-    info.FlightNumber = frmMain.txtFlightNumber.Text
     info.CruiseAltitude = frmMain.txtCruiseAlt.Text
     On Error Resume Next
+    info.FlightNumber = CInt(frmMain.txtFlightNumber.Text)
     info.FlightLeg = CInt(frmMain.txtLeg.Text)
     On Error GoTo 0
 
     'Make sure we're not starting a flight without having PIREPped a previous flight.
     If info.FlightData And Not info.PIREPFiled Then
-        If MsgBox("You have not submitted a PIREP for your previous flight. If you start a new flight now, the previous flight data will be discarded. Are you sure?", vbYesNo Or vbQuestion, "Error") = vbNo Then Exit Sub
+        If MsgBox("You have not submitted a PIREP for your previous flight. If you start a new flight now, the previous flight data will be discarded. Are you sure?", vbYesNo Or vbQuestion, "Error") _
+            = vbNo Then Exit Sub
     End If
     
     'Make sure all required flight data has been entered.
@@ -1947,7 +1983,7 @@ Sub StartFlight()
         MsgBox "Please enter your pilot ID.", vbOKOnly Or vbExclamation, "Cannot Start Flight"
         txtPilotID.SetFocus
         Exit Sub
-    ElseIf info.FlightNumber = "" Then
+    ElseIf (info.FlightNumber = 0) Then
         MsgBox "Please enter the Flight number.", vbOKOnly Or vbExclamation, "Cannot Start Flight"
         txtFlightNumber.SetFocus
         Exit Sub
@@ -1982,10 +2018,11 @@ Sub StartFlight()
         Exit Sub
     End If
     
-    'Update the flight number by adding a code
-    If (InStr(1, "0123456789", Left(txtFlightNumber.Text, 1)) > 0) Then
-        txtFlightNumber.Text = LoadResString(101) & txtFlightNumber.Text
-        info.FlightNumber = txtFlightNumber.Text
+    'Make sure we're rated for the aircraft
+    If config.ACARSConnected And Not info.CheckRide And Not config.HasRating(info.EquipmentType) Then
+        If (MsgBox("You do not have a " & info.EquipmentType & " aircraft rating. This Flight Report" & _
+            vbCrLf & "may not be approved! Do you wish to continue?", vbExclamation + vbYesNo + _
+            vbDefaultButton2, "Not Rated in " & info.EquipmentType) = vbNo) Then Exit Sub
     End If
     
     'Attempt to connect to FSUIPC - Make sure the FSUIPC connection succeeded.
@@ -2041,7 +2078,7 @@ Sub StartFlight()
             ACARSERRORCOLOR
         ShowMessage "APLat=" + CStr(info.airportD.Latitude) + ", APLon=" + _
             CStr(info.airportD.Longitude), DEBUGTEXTCOLOR
-        MsgBox "You are " + CStr(distance) + " miles away from " + info.airportD.Name + _
+        MsgBox "You are " + CStr(distance) + " miles away from " + info.airportD.name + _
             ". You must be within 10 miles to start a flight.", _
             vbExclamation Or vbOKOnly, "Incorrect Departure Airport"
         config.FSUIPCConnected = False
@@ -2109,7 +2146,7 @@ End Sub
 Private Sub mnuSystrayRestore_Click()
     WindowState = vbNormal
     Show
-    TaskBarShow frmMain.hwnd
+    TaskBarShow frmMain.hWnd
     RemoveIcon
 End Sub
 
@@ -2176,7 +2213,7 @@ Private Sub tmrPosUpdates_Timer()
     End If
     
     'Check if it's time to request ATC info
-    If (config.ACARSConnected And (info.FlightID > 0) And (info.Network <> "Offline")) Then
+    If (config.ACARSConnected And (Not isPaused) And (info.FlightID > 0) And (info.Network <> "Offline")) Then
         If (IsEmpty(LastATCUpdate) Or (DateDiff("s", LastATCUpdate, CurrentDate) > 190)) Then
             LastATCUpdate = CurrentDate
             RequestATCInfo info.Network
@@ -2184,7 +2221,7 @@ Private Sub tmrPosUpdates_Timer()
     End If
     
     'Check if it's time to save the flight
-    If config.IsFS9 Then
+    If (config.IsFS9 And (Not isPaused)) Then
         If (IsEmpty(LastFlightSave) Or (DateDiff("s", LastFlightSave, CurrentDate) > 60)) Then
             LastFlightSave = CurrentDate
             PersistFlightData
@@ -2271,8 +2308,69 @@ Private Sub tmrPing_Timer()
     End If
 End Sub
 
+Private Sub tmrStartCheck_Timer()
+    Dim fdrData As PositionData
+    Static acInfo As AircraftInfo
+
+    'Check if FS9 is running and FSUIPC is connected
+    If Not IsFSReady Then Exit Sub
+    
+    'Instantiate aircraft info
+    If (acInfo Is Nothing) Then
+        Set acInfo = GetAircraftInfo()
+        If (acInfo Is Nothing) Then Exit Sub
+    End If
+    
+    'Get flight data
+    Set fdrData = RecordFlightData(acInfo)
+    If ((Not fdrData.Parked) And (Abs(fdrData.GroundSpeed) <= 3)) Then
+        Dim pushbackOff As Integer
+        Dim brakesOn As Integer
+        Dim dwResult As Long
+        
+        ShowMessage "Parkbrake = " + CStr(fdrData.Parked), DEBUGTEXTCOLOR
+        ShowMessage "GroundSpeed = " + CStr(fdrData.GroundSpeed), DEBUGTEXTCOLOR
+    
+        'turn off pushback/turn on brakes gently
+        pushbackOff = 3
+        brakesOn = 10240
+        Call FSUIPC_Write(&H31F0, 2, VarPtr(pushbackOff), dwResult)
+        Call FSUIPC_Write(&HBC4, 2, VarPtr(brakesOn), dwResult)
+        Call FSUIPC_Write(&HBC6, 2, VarPtr(brakesOn), dwResult)
+        If Not FSUIPC_Process(dwResult) Then
+            ShowMessage "Error canceling pushback/start", ACARSERRORCOLOR
+            If config.ShowDebug Then ShowMessage "Disabling Flight Start Timer", DEBUGTEXTCOLOR
+            tmrStartCheck.enabled = False
+            Exit Sub
+        End If
+        
+        'Wait a teensy bit
+        Sleep 275
+        
+        'turn on parking brake
+        brakesOn = 0
+        pushbackOff = 32767
+        Call FSUIPC_Write(&HBC4, 2, VarPtr(brakesOn), dwResult)
+        Call FSUIPC_Write(&HBC6, 2, VarPtr(brakesOn), dwResult)
+        Call FSUIPC_Write(&HBC8, 2, VarPtr(pushbackOff), dwResult)
+        
+        'Write a message - this will write the calls above
+        ShowFSMessage "Pushback Canceled - No Flight Started", True, 15
+        PlaySoundFile "notify_error.wav"
+        If config.ShowDebug Then ShowMessage "Disabling Flight Start Timer", DEBUGTEXTCOLOR
+        tmrStartCheck.enabled = False
+    ElseIf (Abs(fdrData.GroundSpeed) > 3) Then
+        tmrStartCheck.enabled = False
+        ShowMessage "Disabling Flight Start Timer", ACARSTEXTCOLOR
+    End If
+End Sub
+
 Private Sub txtAirportA_Change()
     LimitLength txtAirportA, 4, True
+End Sub
+
+Private Sub txtAirportA_GotFocus()
+    SelectField txtAirportA
 End Sub
 
 Private Sub txtAirportA_LostFocus()
@@ -2291,6 +2389,10 @@ Private Sub txtAirportD_Change()
     LimitLength txtAirportD, 4, True
 End Sub
 
+Private Sub txtAirportD_GotFocus()
+    SelectField txtAirportD
+End Sub
+
 Private Sub txtAirportD_LostFocus()
     Dim ap As Airport
     
@@ -2305,6 +2407,10 @@ End Sub
 
 Private Sub txtAirportL_Change()
     LimitLength txtAirportL, 4, True
+End Sub
+
+Private Sub txtAirportL_GotFocus()
+    SelectField txtAirportL
 End Sub
 
 Private Sub txtAirportL_LostFocus()
@@ -2377,18 +2483,28 @@ Private Sub txtCruiseAlt_Change()
     LimitLength txtCruiseAlt, 5, True
 End Sub
 
-Private Sub txtFlightNumber_Change()
-    LimitLength txtFlightNumber, 7, True
-    info.FlightNumber = txtFlightNumber.Text
+Private Sub txtCruiseAlt_GotFocus()
+    SelectField txtCruiseAlt
 End Sub
 
 Private Sub txtFlightNumber_LostFocus()
-    info.FlightNumber = txtFlightNumber.Text
+    On Error GoTo ResetNumber
+    LimitLength txtFlightNumber, 4, True
+    info.FlightNumber = CInt(txtFlightNumber.Text)
+    
+ExitSub:
+    Exit Sub
+    
+ResetNumber:
+    txtFlightNumber.Text = "001"
+    info.FlightNumber = 1
+    Resume ExitSub
+    
 End Sub
 
 Private Sub txtLeg_Change()
     LimitLength txtLeg, 1
-    If (InStr(1, "123456", txtLeg.Text) < 1) Then txtLeg.Text = 1
+    If (InStr(1, "123456", txtLeg.Text) < 1) Or (Len(txtLeg.Text) = 0) Then txtLeg.Text = 1
     info.FlightLeg = CInt(txtLeg.Text)
 End Sub
 
@@ -2405,9 +2521,13 @@ Private Sub txtRoute_LostFocus()
 End Sub
 
 Private Sub wsckMain_Close()
+    Dim wasConnected As Boolean
+
+    wasConnected = config.ACARSConnected
+
     CloseACARSConnection False
     If config.FSUIPCConnected Then GAUGE_Disconnect
-    If config.ACARSConnected Then
+    If wasConnected Then
         PlaySoundFile "notify_error.wav"
         ShowMessage "ACARS connection closed by server!", ACARSERRORCOLOR
         If info.InFlight Then info.Offline = True
@@ -2426,7 +2546,7 @@ Private Sub wsckMain_Connect()
     ReqStack.Send
     
     'Wait for an ACK
-    If Not WaitForACK(info.AuthReqID, 5750) Then
+    If Not WaitForACK(info.AuthReqID, 9750) Then
         If (info.AuthReqID <> 0) Then
             info.AuthReqID = 0 'Discard the ACK if it comes back
             MsgBox "ACARS Authentication timed out!", vbOKOnly + vbCritical, "Timed Out"
@@ -2497,9 +2617,6 @@ Public Sub CloseACARSConnection(Optional blnSendQuit As Boolean = False)
     SSTab1.TabEnabled(1) = False
     SSTab1.TabEnabled(2) = False
     SSTab1.TabVisible(2) = False
-    frmMain.SSTab1.TabEnabled(4) = False
-    frmMain.SSTab1.TabVisible(4) = False
-
     SSTab1.Tab = 0
 End Sub
 
@@ -2613,6 +2730,7 @@ Private Sub ProcessUserCmd(strInput As String)
                 Exit Sub
             End If
 
+            RequestAirlines
             RequestEquipment
             RequestAirports
             ReqStack.Send
@@ -2743,7 +2861,7 @@ Private Sub ProcessUserCmd(strInput As String)
             End If
             
             'Request ATC info
-            RequestATCInfo (info.Network)
+            RequestATCInfo info.Network
             ReqStack.Send
             
         Case "progress"
@@ -2769,17 +2887,17 @@ Private Sub ProcessUserCmd(strInput As String)
             timeToC = (distanceC * 60&) / pos.GroundSpeed
             
             'Display distance
-            ShowMessage "Distance from " & info.airportD.Name & ": " & CStr(distanceD) & " miles", ACARSTEXTCOLOR
-            ShowMessage "Distance to " & info.AirportA.Name & ": " & CStr(distanceA) & " miles (" & _
+            ShowMessage "Distance from " & info.airportD.name & ": " & CStr(distanceD) & " miles", ACARSTEXTCOLOR
+            ShowMessage "Distance to " & info.AirportA.name & ": " & CStr(distanceA) & " miles (" & _
                 CStr(timeToA) & " minutes)", ACARSTEXTCOLOR
-            ShowMessage "Distance to " & AirportC.Name & ": " & CStr(distanceC) & " miles (" & _
+            ShowMessage "Distance to " & AirportC.name & ": " & CStr(distanceC) & " miles (" & _
                 CStr(timeToC) & " minutes)", ACARSTEXTCOLOR
             
             'Display alternate info
             If Not (info.AirportL Is Nothing) Then
                 distanceL = info.AirportL.DistanceTo(pos.Latitude, pos.Longitude)
                 timeToL = (distanceL * 60&) / pos.GroundSpeed
-                ShowMessage "Distance to " & info.AirportL.Name & ": " & CStr(distanceL) & _
+                ShowMessage "Distance to " & info.AirportL.name & ": " & CStr(distanceL) & _
                     " miles (" & CStr(timeToL) & " minutes)", ACARSTEXTCOLOR
             End If
         
@@ -2838,6 +2956,7 @@ Public Sub LockFlightInfo(IsEditable As Boolean)
     txtLeg.enabled = IsEditable
     txtCruiseAlt.enabled = IsEditable
     cboEquipment.enabled = IsEditable
+    cboAirline.enabled = IsEditable
     cboNetwork.enabled = IsEditable
     cboAirportD.enabled = IsEditable
     txtAirportD.enabled = IsEditable
@@ -2859,4 +2978,9 @@ Private Sub LimitLength(txt As TextBox, ByVal maxLen As Integer, Optional doUppe
         txt.Text = UCase(txt.Text)
         txt.SelStart = Len(txt.Text)
     End If
+End Sub
+
+Private Sub SelectField(txt As TextBox)
+    txt.SelStart = 0
+    txt.SelLength = Len(txt.Text)
 End Sub

@@ -55,7 +55,7 @@ Public Function SendFlightInfo(fInfo As FlightData) As Long
     Set cmd = buildCMD("flight_info")
     
     'Add flight plan info
-    AddXMLField cmd, "flight_num", fInfo.FlightNumber, False
+    AddXMLField cmd, "flight_num", fInfo.flightCode, False
     AddXMLField cmd, "leg", CStr(fInfo.FlightLeg), False
     AddXMLField cmd, "equipment", fInfo.EquipmentType, False
     AddXMLField cmd, "cruise_alt", fInfo.CruiseAltitude, False
@@ -218,7 +218,7 @@ Public Sub SendChat(msgText As String, Optional msgTo As String)
     
         AddXMLField cmd, "to", p.ID
         If config.ShowPilotNames Then
-            msgFrom = msgFrom + "->" + p.Name
+            msgFrom = msgFrom + "->" + p.name
         Else
             msgFrom = msgFrom + "->" + p.ID
         End If
@@ -232,14 +232,14 @@ Public Sub SendChat(msgText As String, Optional msgTo As String)
     If config.ShowDebug Then ShowMessage "Sent chat message", DEBUGTEXTCOLOR
 End Sub
 
-Public Function SendCredentials(UserID As String, pwd As String) As Long
+Public Function SendCredentials(userID As String, pwd As String) As Long
     Dim cmd As IXMLDOMElement
 
     'Build the request
     Set cmd = buildCMD("auth")
 
     'Add user and password
-    AddXMLField cmd, "user", UserID, False
+    AddXMLField cmd, "user", userID, False
     AddXMLField cmd, "password", pwd, True
     AddXMLField cmd, "build", App.Revision, False
     ReqStack.Queue cmd
@@ -274,6 +274,17 @@ Public Sub RequestEquipment()
     ReqStack.Queue cmd
     
     If config.ShowDebug Then ShowMessage "Sent equipment list request", DEBUGTEXTCOLOR
+End Sub
+
+Public Sub RequestAirlines()
+    Dim cmd As IXMLDOMElement
+    
+    'Build the request
+    Set cmd = buildCMD("datareq")
+    AddXMLField cmd, "reqtype", "aList", False
+    ReqStack.Queue cmd
+    
+    If config.ShowDebug Then ShowMessage "Sent airline list request", DEBUGTEXTCOLOR
 End Sub
 
 Public Sub RequestAirports()
@@ -318,6 +329,8 @@ Public Function SendPosition(ByVal cPos As PositionData, Optional noFlood As Boo
     AddXMLField cmd, "aSpeed", cPos.AirSpeed, False
     AddXMLField cmd, "gSpeed", cPos.GroundSpeed, False
     AddXMLField cmd, "vSpeed", cPos.VerticalSpeed, False
+    AddXMLField cmd, "aoa", FormatNumber(cPos.AngleOfAttack, "#0.000"), False
+    AddXMLField cmd, "g", FormatNumber(cPos.GForce, "#0.000"), False
     AddXMLField cmd, "pitch", FormatNumber(cPos.Pitch, "#0.000"), False
     AddXMLField cmd, "bank", FormatNumber(cPos.Bank, "#0.000"), False
     AddXMLField cmd, "mach", FormatNumber(cPos.Mach, "0.000"), False
@@ -350,7 +363,7 @@ Public Function SendPIREP(info As FlightData) As Long
     'Add pirep info fields
     AddXMLField cmd, "flightID", CStr(info.FlightID), False
     If info.CheckRide Then AddXMLField cmd, "checkRide", "true", False
-    AddXMLField cmd, "flightcode", info.FlightNumber, False
+    AddXMLField cmd, "flightcode", info.flightCode, False
     AddXMLField cmd, "leg", CStr(info.FlightLeg), False
     AddXMLField cmd, "eqType", info.EquipmentType, False
     AddXMLField cmd, "airportD", info.airportD.IATA, False

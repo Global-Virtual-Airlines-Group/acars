@@ -44,6 +44,7 @@ Class=UTCDate; UTCDate.cls
 Module=TSRemote; modTSRemote.bas
 Class=ACKBuffer; ACKBuffer.cls
 ResFile32="afv_imgs.res"
+Class=Airline; Airline.cls
 IconForm="frmSplash"
 Startup="Sub Main"
 HelpFile=""
@@ -57,7 +58,7 @@ Description="ACARS client for Aviation Français Virtuel pilots"
 CompatibleMode="0"
 MajorVer=1
 MinorVer=2
-RevisionVer=66
+RevisionVer=69
 AutoIncrementVer=0
 ServerSupportFiles=0
 VersionComments="FSUIPC Key = O7K11GQHV9D7"

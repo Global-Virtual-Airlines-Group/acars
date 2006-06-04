@@ -20,6 +20,7 @@ Private Const INT_FORMAT_KEY = "Control Panel\International"
 
 'Airport configuration file
 Private Const AIRPORT_DATA = "airports.cfg"
+Private Const AIRLINE_DATA = "airlines.cfg"
 Private Const EQ_DATA = "eqTypes.cfg"
 
 'Server connection constants.
@@ -32,6 +33,7 @@ Private Const DEFAULT_PING_INTERVAL = 45
 Private ACARS_Host As String
 Private ACARS_Port As Integer
 
+Private aLines As Variant
 Private eqTypes As Variant
 Private airportInfo As Variant
 
@@ -57,9 +59,11 @@ Public HideMessagesWhenBusy As Boolean
 Public SterileCockpit As Boolean
 Public GaugeSupport As Boolean
 Public FreezeWindow As Boolean
+Public DisableAutoSave As Boolean
 
 'Security roles
 Private Roles As Variant
+Private Ratings As Variant
 Public IsUnrestricted As Boolean
 Public NoMessages As Boolean
 
@@ -96,7 +100,7 @@ Private Const CSIDL_LOCAL_APPDATA = &H1C&
 'Win32 API functions to get My Docs folder
 'Private Declare Function lstrlenW Lib "kernel32" (ByVal lpString As Long) As Long
 Private Declare Function SHGetFolderPath Lib "shfolder.dll" Alias "SHGetFolderPathA" _
-  (ByVal hwnd As Long, ByVal nFolder As Long, ByVal hToken As Long, ByVal dwReserved As Long, _
+  (ByVal hWnd As Long, ByVal nFolder As Long, ByVal hToken As Long, ByVal dwReserved As Long, _
   ByVal lpszPath As String) As Long
 
 Public Sub Class_Initialize()
@@ -105,9 +109,12 @@ Public Sub Class_Initialize()
     DateSeparator = RegReadString(HKEY_CURRENT_USER, INT_FORMAT_KEY, "sDate", "/")
     TimeSeparator = RegReadString(HKEY_CURRENT_USER, INT_FORMAT_KEY, "sTime", ":")
 
+    'Init arrays
     eqTypes = Array("A310", "A318", "A319", "A320", "A321", "A330-200", "A340-300", "ATR-72", "B707-320", "B727-200", "B737-200", "B737-300", "B737-800", "B747-100", "B747-200", "B747-400", "B757-200", "B767-200", "B767-300", "B767-400", "B777-200", "B777-300", "Caravelle", "Comet", "Concorde", "Constellation", "CRJ-200", "CRJ-700", "CV-880", "DC-10-10", "DC-3", "DC-6", "DC-8-11", "DC-8-33", "DC-8-51", "DC-8-61", "DC-8-71", "DC-9-14", "DC-9-32", "DO-328", "EMB-120", "ERJ-135", "ERJ-145", "L-1011", "MD-11", "MD-88", "MD-90")
     airportInfo = Array()
     Roles = Array()
+    Ratings = Array()
+    aLines = Array()
 
     'Load Global Settings
     ACARS_Host = RegReadString(HKEY_LOCAL_MACHINE, REG_SETTINGS_KEY, "ACARSServerHost", DEFAULT_ACARS_HOST)
@@ -147,10 +154,11 @@ Public Sub Class_Initialize()
     GaugeSupport = RegReadBoolean(HKEY_LOCAL_MACHINE, REG_SETTINGS_KEY, "GaugeIntegration", False)
     FreezeWindow = RegReadBoolean(HKEY_CURRENT_USER, REG_SETTINGS_KEY, "FreezeWindow", False)
     ShowTimestamps = RegReadBoolean(HKEY_LOCAL_MACHINE, REG_SETTINGS_KEY, "ShowTimestamps", True)
+    DisableAutoSave = RegReadBoolean(HKEY_CURRENT_USER, REG_SETTINGS_KEY, "DisableAutoSave", False)
     ShowDebug = RegReadBoolean(HKEY_LOCAL_MACHINE, REG_SETTINGS_KEY, "ShowDebug", False)
     WideFSInstalled = RegReadBoolean(HKEY_LOCAL_MACHINE, REG_SETTINGS_KEY, "WideFS", False)
-    TS2Support = RegReadBoolean(HKEY_LOCAL_MACHINE, REG_SETTINGS_KEY, "TS2Support", False) _
-        And TS2Installed
+    TS2Support = RegReadBoolean(HKEY_LOCAL_MACHINE, REG_SETTINGS_KEY, "TS2Support", False) '_
+        'And TS2Installed
     SB3Support = RegReadBoolean(HKEY_LOCAL_MACHINE, REG_SETTINGS_KEY, "SB3Support", False) _
         And (SB3Installed Or WideFSInstalled)
 End Sub
@@ -172,7 +180,7 @@ Property Let IsFS9(fs9 As Boolean)
     'Load the My Documents folder
     Dim buf As String
     buf = Space$(260)
-    If (SHGetFolderPath(frmMain.hwnd, CSIDL_MYDOCUMENTS, 0&, -1&, buf) = 0) Then
+    If (SHGetFolderPath(frmMain.hWnd, CSIDL_MYDOCUMENTS, 0&, -1&, buf) = 0) Then
         FS9Data = Left(buf, InStr(buf, vbNullChar) - 1) + "\Flight Simulator Files"
         If ShowDebug Then ShowMessage "Detected FS9 data folder " + FS9Data, DEBUGTEXTCOLOR
     Else
@@ -195,9 +203,10 @@ Public Sub UpdateSettingsMenu()
         .mnuCOMSterileCockpit.Checked = SterileCockpit
         .mnuOptionsSB3Support.enabled = SB3Installed Or WideFSInstalled
         .mnuOptionsSB3Support.Checked = SB3Support
-        .mnuOptionsTS2Support.enabled = TS2Installed And False
+        .mnuOptionsTS2Support.enabled = False 'TS2Installed And False
         .mnuOptionsTS2Support.Checked = TS2Support
         .mnuOptionsWideFS.Checked = WideFSInstalled
+        .mnuOptionsDisableAutoSave.Checked = DisableAutoSave
         
         'Update SB3 support
         .mnuSaveFlightPlan.enabled = SB3Support
@@ -206,7 +215,7 @@ Public Sub UpdateSettingsMenu()
 End Sub
 
 Public Sub UpdateFlightInfo()
-    frmMain.txtFlightNumber.Text = info.FlightNumber
+    If (info.FlightNumber > 0) Then frmMain.txtFlightNumber.Text = CStr(info.FlightNumber)
     frmMain.txtCruiseAlt.Text = info.CruiseAltitude
     frmMain.txtRemarks.Text = info.Remarks
     frmMain.txtRoute.Text = info.Route
@@ -234,6 +243,7 @@ Public Sub Save()
     RegWriteBoolean HKEY_CURRENT_USER, REG_SETTINGS_KEY, "HideOnMinimize", HideWhenMinimized
     RegWriteBoolean HKEY_CURRENT_USER, REG_SETTINGS_KEY, "HideMessagesWhenBusy", HideMessagesWhenBusy
     RegWriteBoolean HKEY_CURRENT_USER, REG_SETTINGS_KEY, "SterileCockpit", SterileCockpit
+    RegWriteBoolean HKEY_CURRENT_USER, REG_SETTINGS_KEY, "DisableAutoSave", DisableAutoSave
     RegWriteBoolean HKEY_LOCAL_MACHINE, REG_SETTINGS_KEY, "WideFS", WideFSInstalled
     RegWriteBoolean HKEY_LOCAL_MACHINE, REG_SETTINGS_KEY, "SB3Support", SB3Support
     RegWriteBoolean HKEY_LOCAL_MACHINE, REG_SETTINGS_KEY, "TS2Support", TS2Support
@@ -259,7 +269,7 @@ Property Get AirportNames() As Variant
     ReDim result(UBound(airportInfo))
     For x = 0 To UBound(airportInfo)
         Set a = airportInfo(x)
-        result(x) = a.Name + " (" + a.ICAO + ")"
+        result(x) = a.name + " (" + a.ICAO + ")"
     Next
         
     AirportNames = result
@@ -269,13 +279,45 @@ Property Get EquipmentTypes() As Variant
     EquipmentTypes = eqTypes
 End Property
 
+Property Get AirlineNames() As Variant
+    Dim x As Integer
+    Dim a As Airline
+    Dim results As Variant
+
+    ReDim results(UBound(aLines))
+    For x = 0 To UBound(aLines)
+        Set a = aLines(x)
+        results(x) = a.name
+    Next
+    
+    AirlineNames = results
+End Property
+
 Public Sub AddAirport(ap As Airport)
     ReDim Preserve airportInfo(UBound(airportInfo) + 1)
     Set airportInfo(UBound(airportInfo)) = ap
 End Sub
 
-Public Function GetAirportByOfs(ofs As Integer) As Airport
+Public Sub AddAirline(ByVal aCode As String, ByVal aName As String)
+    Dim a As Airline
+    
+    'If we already have the code, ignore it
+    If Not (GetAirline(aCode) Is Nothing) Then Exit Sub
+    
+    'Create the airline
+    Set a = New Airline
+    a.code = aCode
+    a.name = aName
+    ReDim Preserve aLines(UBound(aLines) + 1)
+    Set aLines(UBound(aLines)) = a
+End Sub
+
+Public Function GetAirportByOfs(ByVal ofs As Integer) As Airport
     If (ofs >= 0) Then Set GetAirportByOfs = airportInfo(ofs)
+End Function
+
+Public Function GetAirlineByOfs(ByVal ofs As Integer) As Airline
+    If (ofs >= 0) Then Set GetAirlineByOfs = aLines(ofs)
 End Function
 
 Public Sub AddEquipment(ByVal eqType As String)
@@ -291,6 +333,25 @@ Public Sub ClearRoles()
     Roles = Array()
 End Sub
 
+Public Sub AddRating(ByVal eqType As String)
+    If Not HasRating(eqType) Then
+        ReDim Preserve Ratings(UBound(Ratings) + 1)
+        Ratings(UBound(Ratings)) = eqType
+    End If
+End Sub
+
+Public Function HasRating(ByVal eqType As String) As Boolean
+    Dim rName As Variant
+    
+    If (UBound(Ratings) = -1) Then Exit Function
+    For Each rName In Ratings
+        If (eqType = rName) Then
+            HasRating = True
+            Exit Function
+        End If
+    Next
+End Function
+
 Public Sub AddRole(ByVal RoleName As String)
     If Not HasRole(RoleName) Then
         ReDim Preserve Roles(UBound(Roles) + 1)
@@ -302,8 +363,6 @@ Public Function HasRole(ByVal RoleName As String) As Boolean
     Dim rName As Variant
 
     If (UBound(Roles) = -1) Then Exit Function
-    
-    'Loop through the roles
     For Each rName In Roles
         If ((rName = RoleName) Or (rName = "Admin")) Then
             HasRole = True
@@ -402,7 +461,6 @@ Public Sub SaveAirports()
     Dim lat As String
     Dim lng As String
     
-    'Set critical error handler
     On Error GoTo FatalError
     
     'Save the airports
@@ -412,9 +470,79 @@ Public Sub SaveAirports()
         Set a = airportInfo(x)
         lat = Replace(Format(a.Latitude, "##0.00000"), DecimalSeparator, ".")
         lng = Replace(Format(a.Longitude, "##0.00000"), DecimalSeparator, ".")
-        Print #fNum, a.Name + "," + a.IATA + "," + a.ICAO + "," + lat + "," + lng
+        Print #fNum, a.name + "," + a.IATA + "," + a.ICAO + "," + lat + "," + lng
     Next
     
+    Close #fNum
+    
+    'Clear the force update flag if present
+    ForceCfgUpdate = False
+    RegDelValue HKEY_CURRENT_USER, REG_SETTINGS_KEY, "UpdateConfig"
+    
+ExitSub:
+    Exit Sub
+    
+FatalError:
+    MsgBox "Cannot save Airport data!", vbOKOnly + vbCritical, "I/O Error"
+    Resume ExitSub
+
+End Sub
+
+Public Sub LoadAirlines()
+    Dim fNum As Integer
+    Dim rawData As Variant
+    Dim alData As Variant
+    Dim rawAirline As Variant
+    Dim a As Airline
+
+    On Error GoTo FatalError
+
+    fNum = FreeFile()
+    Open App.path + "\" + AIRLINE_DATA For Input As #fNum
+    rawData = Split(Input(LOF(fNum), fNum), vbCrLf)
+    Close #fNum
+
+    For Each rawAirline In rawData
+        alData = Split(rawAirline, ",")
+        If (UBound(alData) > 0) Then
+            Set a = New Airline
+            a.code = alData(0)
+            a.name = Trim(alData(1))
+            
+            'Add the airline
+            ReDim Preserve aLines(UBound(aLines) + 1)
+            Set aLines(UBound(aLines)) = a
+        End If
+    Next
+
+ExitSub:
+    Exit Sub
+    
+FatalError:
+    MsgBox "Cannot load Airline data!", vbOKOnly + vbCritical, "I/O Error"
+    Resume ExitSub
+
+End Sub
+
+Public Sub ClearAirlines()
+    aLines = Array()
+End Sub
+
+Public Sub SaveAirlines()
+    Dim fNum As Integer
+    Dim x As Integer
+    Dim a As Airline
+    
+    On Error GoTo FatalError
+
+    'Save the airlines
+    fNum = FreeFile()
+    Open App.path + "\" + AIRLINE_DATA For Output As #fNum
+    For x = 0 To UBound(aLines)
+        Set a = aLines(x)
+        Print #fNum, a.code + "," + a.name
+    Next
+
     Close #fNum
     
     'Clear the force update flag if present
@@ -448,7 +576,7 @@ Public Sub LoadAirports()
         apData = Split(rawAirport, ",")
         If (UBound(apData) > 0) Then
             Set a = New Airport
-            a.Name = apData(0)
+            a.name = apData(0)
             a.IATA = apData(1)
             If (UBound(apData) > 1) Then
                 a.ICAO = apData(2)
@@ -468,6 +596,19 @@ FatalError:
     Resume ExitSub
 
 End Sub
+
+Public Function GetAirline(ByVal code As String) As Airline
+    Dim x As Integer
+    Dim a As Airline
+    
+    For x = 0 To UBound(aLines)
+        Set a = aLines(x)
+        If (a.code = UCase(code)) Then
+            Set GetAirline = a
+            Exit Function
+        End If
+    Next
+End Function
 
 Public Function GetAirport(ByVal code As String) As Airport
     Dim x As Integer

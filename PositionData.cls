@@ -38,14 +38,18 @@ Public GearDown As Boolean
 Public EnginesStarted As Boolean
 Public WindSpeed As Integer
 Public WindHeading As Integer
+Public GForce As Double
+Public AngleOfAttack As Double
 
 'Flight state flags
 Public Paused As Boolean
 Public Slewing As Boolean
+Public PushBack As Boolean
 Public onGround As Boolean
 Public AfterBurner As Boolean
 Public Parked As Boolean
 Public simRate As Integer
+Public CockpitView As Boolean
 
 'Autopilot flags
 Public AP_HDG As Boolean

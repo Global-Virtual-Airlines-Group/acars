@@ -1,8 +1,8 @@
-frmMain = 44, 58, 893, 848, C, 44, 58, 719, 683, C
+frmMain = 44, 58, 893, 848, C, 44, 58, 719, 796, C
 frmResume = 0, 0, 0, 0, C, 88, 116, 763, 741, C
 frmCharts = 0, 0, 0, 0, C, 110, 145, 785, 770, C
 FSUIPC = 0, 0, 0, 0, C
-Configuration = 110, 145, 783, 770, C
+Configuration = 110, 145, 783, 770, 
 FlightData = 78, 164, 835, 789, C
 PositionData = 0, 0, 0, 0, C
 RequestStack = 66, 87, 741, 712, C
@@ -33,3 +33,4 @@ frmDraftPIREP = 0, 0, 0, 0, C, 154, 203, 827, 828, C
 UTCDate = 0, 0, 0, 0, C
 TSRemote = 0, 0, 0, 0, C
 ACKBuffer = 0, 0, 0, 0, C
+Airline = 0, 0, 0, 0, C
