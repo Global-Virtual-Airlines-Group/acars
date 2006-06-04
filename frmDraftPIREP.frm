@@ -249,7 +249,8 @@ Private Sub cmdLoad_Click()
     
     'Load the flight data
     Set pirep = flights(lstPIREP.ListIndex)
-    info.FlightNumber = pirep.flightCode
+    Set info.Airline = pirep.Airline
+    info.FlightNumber = pirep.FlightNumber
     info.FlightLeg = pirep.Leg
     info.EquipmentType = pirep.EquipmentType
     Set info.airportD = pirep.airportD
@@ -271,10 +272,11 @@ Private Sub lstPIREP_Click()
 
     'Load the flight data
     Set pirep = flights(lstPIREP.ListIndex)
-    flightCode.Caption = pirep.flightCode + " Leg " + CStr(pirep.Leg)
+    flightCode.Caption = pirep.Airline.code + CStr(pirep.FlightNumber) + _
+        " Leg " + CStr(pirep.Leg)
     eqType.Caption = pirep.EquipmentType
-    airportD.Caption = pirep.airportD.Name + " (" + pirep.airportD.ICAO + ")"
-    AirportA.Caption = pirep.AirportA.Name + " (" + pirep.AirportA.ICAO + ")"
+    airportD.Caption = pirep.airportD.name + " (" + pirep.airportD.ICAO + ")"
+    AirportA.Caption = pirep.AirportA.name + " (" + pirep.AirportA.ICAO + ")"
     
     'Display stuff
     frameFlightInfo.visible = True

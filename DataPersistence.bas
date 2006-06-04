@@ -37,7 +37,8 @@ Public Sub PersistFlightData(Optional writeMsg As Boolean = False)
     'Save the flight information
     Set inf = xdoc.createNode(NODE_ELEMENT, "info", "")
     AddXMLField inf, "id", CStr(info.FlightID), False
-    AddXMLField inf, "flight", info.FlightNumber, False
+    AddXMLField inf, "airline", info.Airline.code, False
+    AddXMLField inf, "flight", CStr(info.FlightNumber), False
     AddXMLField inf, "leg", CStr(info.FlightLeg), False
     AddXMLField inf, "phase", CStr(info.FlightPhase), False
     AddXMLField inf, "equipment", info.EquipmentType, False
@@ -119,6 +120,8 @@ Public Sub PersistFlightData(Optional writeMsg As Boolean = False)
             AddXMLField e, "mach", FormatNumber(cPos.Mach, "0.000"), False
             AddXMLField e, "n1", FormatNumber(cPos.AverageN1, "##0.0"), False
             AddXMLField e, "n2", FormatNumber(cPos.AverageN2, "##0.0"), False
+            AddXMLField e, "aoa", FormatNumber(cPos.AngleOfAttack, "#0.000"), False
+            AddXMLField e, "g", FormatNumber(cPos.GForce, "#0.000"), False
             AddXMLField e, "fuelFlow", CStr(cPos.FuelFlow), False
             AddXMLField e, "phase", cPos.phase, False
             AddXMLField e, "simrate", CStr(cPos.simRate / 256), False
@@ -127,6 +130,7 @@ Public Sub PersistFlightData(Optional writeMsg As Boolean = False)
             AddXMLField e, "weight", CStr(cPos.weight), False
             AddXMLField e, "wHdg", CStr(cPos.WindHeading), False
             AddXMLField e, "wSpeed", CStr(cPos.WindSpeed), False
+            
             AddXMLField e, "date", FormatDateTime(cPos.DateTime.UTCTime, "mm/dd/yyyy hh:nn:ss")
             AddXMLField e, "flags", CStr(cPos.Flags), False
 
@@ -222,7 +226,7 @@ Public Function RestoreFlightData(ByVal flightCode As String) As SavedFlight
     
         Set xmlError = doc.parseError
         strError = "Error code: " & xmlError.errorCode & vbCrLf _
-            & "Reason: " & xmlError.Reason & vbCrLf _
+            & "Reason: " & xmlError.reason & vbCrLf _
             & "Source: " & vbCrLf & xmlError.srcText
         MsgBox "The following error occurred while parsing flight data: " & _
             vbCrLf & vbCrLf & strError, vbCritical Or vbOKOnly, "Fatal Error!"
@@ -263,7 +267,8 @@ Public Function RestoreFlightData(ByVal flightCode As String) As SavedFlight
     Set result.FlightInfo = New FlightData
     With result.FlightInfo
         .FlightID = CLng(getChild(inf, "id", "0"))
-        .FlightNumber = getChild(inf, "flight", "DVA001")
+        Set .Airline = config.GetAirline(getChild(inf, "airline", ""))
+        .FlightNumber = CInt(getChild(inf, "flight", "1"))
         .FlightLeg = CInt(getChild(inf, "leg", "1"))
         .FlightPhase = CInt(getChild(inf, "phase", CStr(AIRBORNE)))
         .EquipmentType = getChild(inf, "equipment", "CRJ-200")
@@ -335,6 +340,8 @@ Public Function RestoreFlightData(ByVal flightCode As String) As SavedFlight
             sPos.Pitch = ParseNumber(getChild(p, "pitch", "0.00"))
             sPos.Bank = ParseNumber(getChild(p, "bank", "0.00"))
             sPos.Mach = ParseNumber(getChild(p, "mach", "0.00"))
+            sPos.AngleOfAttack = ParseNumber(getChild(p, "aoa", "0.00"))
+            sPos.GForce = ParseNumber(getChild(p, "g", "0.00"))
             
             'This is a hack since we don't have individual N1/N2 values
             sPos.EngineCount = 1

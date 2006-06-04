@@ -9,7 +9,7 @@ Private Const SND_ALIAS = &H10000:
 Private Const SND_FILENAME = &H20000:
 Private Const SND_ASYNC = &H1:
 Private Declare Function PlaySound Lib "winmm.dll" Alias "PlaySoundA" (ByVal lpszName As String, ByVal hModule As Long, ByVal dwFlags As Long) As Long
-Public Declare Function SetForegroundWindow Lib "user32" (ByVal hwnd As Long) As Long
+Public Declare Function SetForegroundWindow Lib "user32" (ByVal hWnd As Long) As Long
 
 'ACARS constants.
 Public Const ACARSVERSION = 1
@@ -28,7 +28,11 @@ Public Const SYSMSGCOLOR = vbBlue
 Public Const XML_IN_COLOR = &HAAAAAA
 Public Const XML_OUT_COLOR = &HCACACA
 
-'Miscellaneous constants.
+'Minimum FSUIPC version constants
+Private Const MIN_FSUIPC_CODE = &H36010000
+Private Const MIN_FSUIPC_VERSION = "3.601"
+
+'Miscellaneous constants
 Public Const MAXTIMECOMPRESSION = 4
 Public Const MINTIMECOMPRESSION = 1
 Public Const MAX_TEXT_MESSAGES = 5
@@ -72,14 +76,13 @@ Public Sub ApplicationStartup()
     frmMain.SSTab1.TabEnabled(1) = False
     frmMain.SSTab1.TabVisible(2) = False
     frmMain.SSTab1.TabEnabled(2) = False
-    frmMain.SSTab1.TabEnabled(4) = False
-    frmMain.SSTab1.TabVisible(4) = False
     
     'Load configuration
     frmSplash.SetProgressLabel "Loading application configuration"
     Set config = New Configuration
     config.LoadAirports
     config.LoadEquipment
+    config.LoadAirlines
     frmMain.SSTab1.TabVisible(3) = config.ShowDebug
     
     'Set startup message
@@ -216,11 +219,18 @@ Public Sub ApplicationStartup()
     'Update settings
     frmSplash.SetProgressLabel "Loading airport/equipment options"
     SetComboChoices frmMain.cboEquipment, config.EquipmentTypes, info.EquipmentType, "-"
+    SetComboChoices frmMain.cboAirline, config.AirlineNames, config.GetAirline(LoadResString(101)).name, "-"
     SetAirport frmMain.cboAirportD, config.AirportNames, info.airportD
     SetAirport frmMain.cboAirportA, config.AirportNames, info.AirportA
     SetAirport frmMain.cboAirportL, config.AirportNames, info.AirportL
     config.UpdateSettingsMenu
     config.UpdateFlightInfo
+    
+    'If FS is running, connect to FSUIPC
+    If IsFSRunning And Not config.FSUIPCConnected Then
+        frmSplash.SetProgressLabel "Connecting to FSUIPC"
+        FSUIPC_Connect
+    End If
     
     'Set enabled state of buttons
     SetButtonMenuStates
@@ -252,6 +262,7 @@ Public Sub ApplicationStartup()
     'Display the main form.
     frmMain.Show
     frmMain.txtCmd.SetFocus
+    If config.FSUIPCConnected Then frmMain.tmrStartCheck.enabled = True
 End Sub
 
 Public Function ConfirmExit() As Boolean
@@ -329,10 +340,10 @@ Public Function FSUIPC_Connect(Optional showError As Boolean = False) As Integer
         Exit Function
     End If
         
-    'Check that we're using FSUIPC 3.522 or above
-    If (FSUIPC_Version < &H35220000) Then
-        MsgBox App.ProductName & " requires FSUIPC v3.522 or newer.", vbOKOnly Or vbCritical, _
-            "Unsupported FSUIPC Version"
+    'Check that we're using a supported FSUIPC version
+    If (FSUIPC_Version < MIN_FSUIPC_CODE) Then
+        MsgBox App.ProductName & " requires FSUIPC v" & MIN_FSUIPC_VERSION & " or newer.", _
+            vbOKOnly Or vbCritical, "Unsupported FSUIPC Version"
         FSUIPC_Close
         FSUIPC_Connect = 16
         Exit Function
@@ -402,12 +413,10 @@ Public Sub ShowMessage(Msg As String, color As Long)
 
     With frmMain.rtfText
         oldSelPos = .SelStart
-        
-        .SelColor = color
         .SelStart = Len(.TextRTF)
         .SelLength = 0
-        
-        If Len(.Text) > 0 Then
+        .SelColor = color
+        If (Len(.Text) > 0) Then
             .SelText = vbCrLf & tStamp & Msg
         Else
             .SelText = tStamp & Msg
@@ -421,6 +430,31 @@ Public Sub ShowMessage(Msg As String, color As Long)
             .SelStart = Len(.TextRTF)
         End If
     End With
+End Sub
+
+Public Sub ShowFSMessage(ByVal Msg As String, Optional scroll As Boolean = False, Optional wait As Integer = 8)
+    Dim dwResult As Long
+    Dim msgOptions As Integer
+
+    'Ensure FSUIPC is connected
+    If Not config.FSUIPCConnected Then Exit Sub
+    
+    'Truncate the message if necessary
+    If (Len(Msg) > 127) Then Msg = Left(Msg, 127)
+    Msg = Msg + Chr(0)
+    
+    'Set scrolling options
+    If (wait < 1) Then wait = 2
+    If scroll Then
+        msgOptions = (wait * -1)
+    Else
+        msgOptions = wait
+    End If
+    
+    'Write the message
+    Call FSUIPC_WriteS(&H3380, Len(Msg), Msg, dwResult)
+    Call FSUIPC_Write(&H32FA, 2, VarPtr(msgOptions), dwResult)
+    If Not FSUIPC_Process(dwResult) Then ShowMessage "Error writing AdvMessage", ACARSERRORCOLOR
 End Sub
 
 Public Sub ShowDebug(XML As String, Optional color As Long = XML_IN_COLOR)
@@ -445,7 +479,7 @@ Public Sub SetAirport(combo As ComboBox, choices As Variant, ap As Airport)
     If (ap Is Nothing) Then
         SetComboChoices combo, choices, "-", "-"
     Else
-        SetComboChoices combo, choices, ap.Name + " (" + ap.ICAO + ")", "-"
+        SetComboChoices combo, choices, ap.name + " (" + ap.ICAO + ")", "-"
     End If
 End Sub
 
@@ -475,11 +509,11 @@ Public Sub SetComboChoices(combo As ComboBox, choices As Variant, Optional newVa
     If (combo.ListIndex = -1) Then combo.ListIndex = 0
 End Sub
 
-Public Sub PlaySoundFile(Name As String)
+Public Sub PlaySoundFile(name As String)
     Dim fName As String
     
     'Check that the file exists
-    fName = App.path + "\" + Name
+    fName = App.path + "\" + name
     If (Dir(fName) <> "") Then
         PlaySound fName, 0, SND_ASYNC And SND_FILENAME
     Else
@@ -490,4 +524,3 @@ End Sub
 Public Sub PlaySoundAlias(ByVal alias As String)
     PlaySound alias, 0, SND_ASYNC And SND_ALIAS
 End Sub
-

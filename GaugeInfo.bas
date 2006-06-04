@@ -40,12 +40,12 @@ Public Sub GAUGE_SetInfo(fInfo As FlightData, PilotID As String)
     'Do nothing if gauge support disabled
     If Not config.GaugeSupport Or Not config.FSUIPCConnected Then Exit Sub
     
-    pID = PilotID & vbNullChar
-    fID = fInfo.FlightNumber & vbNullChar
+    pID = PilotID & Chr(0)
+    fID = fInfo.flightCode & Chr(0)
     
     Call FSUIPC_Write(FSUIPC_BASE + 2, 4, VarPtr(fInfo.FlightID), lngResult)
-    Call FSUIPC_Write(FSUIPC_BASE + 6, Len(pID), VarPtr(pID), lngResult)
-    Call FSUIPC_Write(FSUIPC_BASE + 16, Len(fID), VarPtr(fID), lngResult)
+    Call FSUIPC_WriteS(FSUIPC_BASE + 6, Len(pID), pID, lngResult)
+    Call FSUIPC_WriteS(FSUIPC_BASE + 16, Len(fID), fID, lngResult)
     Call FSUIPC_Write(FSUIPC_BASE + 26, 1, VarPtr(fInfo.FlightLeg), lngResult)
     Call FSUIPC_Process(lngResult)
     

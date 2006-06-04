@@ -36,7 +36,7 @@ Public Sub ProcessMessage(ByVal msgText As String)
         
         Set xmlError = doc.parseError
         strError = "Error code: " & xmlError.errorCode & vbCrLf _
-            & "Reason: " & xmlError.Reason & vbCrLf _
+            & "Reason: " & xmlError.reason & vbCrLf _
             & "Source: " & vbCrLf & xmlError.srcText
         MsgBox "The following fatal error occurred while parsing XML from the server:" & vbCrLf & vbCrLf & strError, vbCritical Or vbOKOnly, "Fatal Error!"
         If config.ShowDebug Then ShowDebug msgText, DEBUGTEXTCOLOR
@@ -150,6 +150,12 @@ Private Sub ProcessACK(cmdNode As IXMLDOMNode)
             config.AddRole rName
         Next
         
+        'Get equipment ratings
+        RoleNames = Split(getChild(cmdNode, "ratings", ""), ",")
+        For Each rName In RoleNames
+            config.AddRating rName
+        Next
+        
         'Get unrestricted flag
         config.NoMessages = CBool(getChild(cmdNode, "noMsgs", "false"))
         config.IsUnrestricted = CBool(getChild(cmdNode, "unrestricted", "false")) And Not config.NoMessages
@@ -163,6 +169,7 @@ Private Sub ProcessACK(cmdNode As IXMLDOMNode)
         If Not config.IsConfigUpToDate Then
             RequestEquipment
             RequestAirports
+            RequestAirlines
         End If
         
         If config.SB3Support Then RequestPrivateVoiceURL
@@ -235,14 +242,16 @@ Private Sub ProcessChatText(cmdNode As IXMLDOMNode)
     
     'Check if we are in sterile cockpit mode
     IsSterile = False
-    If ((info.FlightPhase = AIRBORNE) Or (info.FlightPhase = TAKEOFF)) Then IsSterile = (pos.AltitudeMSL < 10000)
+    If ((info.FlightPhase = AIRBORNE) Or (info.FlightPhase = TAKEOFF)) Then
+        If Not (pos Is Nothing) Then IsSterile = (pos.AltitudeMSL < 10000)
+    End If
     
     'Get the message info
     msgTo = getChild(cmdNode, "to", "")
     msgText = getChild(cmdNode, "text", "")
     msgFrom = getChild(cmdNode, "from", "SYSTEM")
     If (msgFrom <> "SYSTEM") Then Set p = users.GetPilot(msgFrom)
-    If (Not (p Is Nothing) And config.ShowPilotNames) Then msgFrom = p.Name
+    If (Not (p Is Nothing) And config.ShowPilotNames) Then msgFrom = p.name
 
     'Check if there is a "To" element. If so, it's a private message.
     config.MsgReceived = True
@@ -256,7 +265,7 @@ Private Sub ProcessChatText(cmdNode As IXMLDOMNode)
             GAUGE_SetChat False
             
             'Play a sound if the option is on
-            If (config.PlaySound And (Not config.Busy) And (GetForegroundWindow <> frmMain.hwnd)) _
+            If (config.PlaySound And (Not config.Busy) And (GetForegroundWindow <> frmMain.hWnd)) _
                 Then PlaySoundFile "notify_msg.wav"
         End If
     Else
@@ -271,7 +280,7 @@ Private Sub ProcessChatText(cmdNode As IXMLDOMNode)
             ElseIf (config.SterileCockpit And IsSterile) Then
                 SendChat "AUTO: I am in a Sterile Cockpit environment and not available to chat.", msgFrom
                 ReqStack.Send
-            ElseIf (config.PlaySound And (Not config.Busy) And (GetForegroundWindow <> frmMain.hwnd)) Then
+            ElseIf (config.PlaySound And (Not config.Busy) And (GetForegroundWindow <> frmMain.hWnd)) Then
                 PlaySoundFile "notify_msg.wav"
             End If
         End If
@@ -296,7 +305,7 @@ Private Sub ProcessDataResponse(cmdNode As IXMLDOMNode)
     For Each rspNode In rspNodes
         Select Case LCase(rspNode.Text)
             Case "pilotlist"
-                Dim Name As String
+                Dim name As String
                 OldDispatch = users.DispatchOnline
                 
                 If config.ShowDebug Then ShowMessage "Updating Pilot List", DEBUGTEXTCOLOR
@@ -324,7 +333,7 @@ Private Sub ProcessDataResponse(cmdNode As IXMLDOMNode)
                     'Check if the ID is ours
                     If (p.ID <> "") Then
                         users.AddPilot p
-                        If (UCase(p.ID) = UCase(frmMain.txtPilotID.Text)) Then frmMain.txtPilotName.Text = p.Name
+                        If (UCase(p.ID) = UCase(frmMain.txtPilotID.Text)) Then frmMain.txtPilotName.Text = p.name
                     End If
                 Next
                 
@@ -370,7 +379,7 @@ Private Sub ProcessDataResponse(cmdNode As IXMLDOMNode)
                     If (p.ID <> "") Then
                         Set oldPilot = users.GetPilot(p.ID)
                         users.AddPilot p
-                        If (oldPilot Is Nothing) Then ShowMessage p.Name + " (" + p.ID + _
+                        If (oldPilot Is Nothing) Then ShowMessage p.name + " (" + p.ID + _
                             ") logged into the ACARS server.", ACARSTEXTCOLOR
                     End If
                 Next
@@ -400,7 +409,7 @@ Private Sub ProcessDataResponse(cmdNode As IXMLDOMNode)
                     p.LastName = getChild(pNode, "lastname", "")
 
                     users.DeletePilot p.ID
-                    ShowMessage p.Name + " (" + p.ID + ") logged out from the ACARS server.", ACARSTEXTCOLOR
+                    ShowMessage p.name + " (" + p.ID + ") logged out from the ACARS server.", ACARSTEXTCOLOR
                 Next
                 
                 'Update the Pilot List
@@ -425,7 +434,7 @@ Private Sub ProcessDataResponse(cmdNode As IXMLDOMNode)
                     ctr.ID = getAttr(pNode, "code", "?")
                     ctr.NetworkID = getAttr(pNode, "networkID", "000000")
                     ctr.Frequency = getAttr(pNode, "freq", "199.98")
-                    ctr.Name = getAttr(pNode, "name", "???")
+                    ctr.name = getAttr(pNode, "name", "???")
                     ctr.Rating = getAttr(pNode, "rating", "Observer")
                     ctr.FacilityType = getAttr(pNode, "type", "Center")
                     
@@ -492,7 +501,7 @@ Private Sub ProcessDataResponse(cmdNode As IXMLDOMNode)
                         Set a = New Airport
                         a.ICAO = getAttr(pNode, "icao")
                         a.IATA = getAttr(pNode, "iata")
-                        a.Name = Replace(getAttr(pNode, "name", a.ICAO), ",", "")
+                        a.name = Replace(getAttr(pNode, "name", a.ICAO), ",", "")
                         a.Latitude = CDbl(Replace(getAttr(pNode, "lat", "0"), ".", config.DecimalSeparator))
                         a.Longitude = CDbl(Replace(getAttr(pNode, "lng", "0"), ".", config.DecimalSeparator))
                         config.AddAirport a
@@ -502,6 +511,20 @@ Private Sub ProcessDataResponse(cmdNode As IXMLDOMNode)
                     SetComboChoices frmMain.cboAirportA, config.AirportNames, "", "-"
                     If config.ShowDebug Then ShowMessage "Updated Airport List, size=" + CStr(UBound(config.AirportNames) + 1), DEBUGTEXTCOLOR
                     config.SaveAirports
+                End If
+                
+            Case "airlines"
+                Set pNode = cmdNode.selectSingleNode("airlines")
+                If Not (pNode Is Nothing) Then
+                    Set pNodes = pNode.selectNodes("airline")
+                    config.ClearAirlines
+                    For Each pNode In pNodes
+                        config.AddAirline getAttr(pNode, "code"), getAttr(pNode, "name")
+                    Next
+                    
+                    SetComboChoices frmMain.cboAirline, config.AirlineNames, info.Airline.name, "-"
+                    If config.ShowDebug Then ShowMessage "Updated Airline List", DEBUGTEXTCOLOR
+                    config.SaveAirlines
                 End If
 
             Case "pireps"
@@ -514,7 +537,8 @@ Private Sub ProcessDataResponse(cmdNode As IXMLDOMNode)
                 Set pNodes = pNode.selectNodes("pirep")
                 For Each pNode In pNodes
                     Set fr = New FlightReport
-                    fr.flightCode = getAttr(pNode, "airline", "") + getAttr(pNode, "number", "001")
+                    Set fr.Airline = config.GetAirline(getAttr(pNode, "airline", ""))
+                    fr.FlightNumber = CInt(getAttr(pNode, "number", "001"))
                     fr.Leg = CInt(getAttr(pNode, "leg", "1"))
                     fr.EquipmentType = getChild(pNode, "eqType", "")
                     Set fr.airportD = config.GetAirport(getChild(pNode, "airportD", ""))
