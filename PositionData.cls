@@ -44,7 +44,7 @@ Public AngleOfAttack As Double
 'Flight state flags
 Public Paused As Boolean
 Public Slewing As Boolean
-Public PushBack As Boolean
+Public PUSHBACK As Boolean
 Public onGround As Boolean
 Public AfterBurner As Boolean
 Public Parked As Boolean
@@ -192,4 +192,25 @@ Property Get Flags() As Long
     If AT_MCH Then tmpFlags = tmpFlags Or FLIGHT_AT_MACH
     
     Flags = tmpFlags
+End Property
+
+Property Get WarningCode() As Integer
+
+    WarningCode = 0
+    If ((AirSpeed >= 250) And (AltitudeMSL < 10000)) Then
+        WarningCode = 1
+        'above 250 under 10k
+    ElseIf ((AltitudeAGL < 1500) And (VerticalSpeed < -1500)) Then
+        WarningCode = 2
+        'excessive descent on final
+    ElseIf (Abs(Bank) > 45) Then
+        WarningCode = 3
+        'excessive bank
+    ElseIf (Abs(Pitch) > 35) Then
+        WarningCode = 4
+        'excessive pitch
+    ElseIf (Abs(1 - GForce) > 0.25) Then
+        WarningCode = 5
+        'excessive Gs
+    End If
 End Property

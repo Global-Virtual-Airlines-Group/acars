@@ -30,6 +30,7 @@ End Sub
 
 Private Sub Reset()
     Dim tmpID As Long
+    Dim pi As IXMLDOMProcessingInstruction
     
     tmpID = DateDiff("s", RootDate, Now)
     If (tmpID <= ReqID) Then
@@ -37,14 +38,17 @@ Private Sub Reset()
     Else
         ReqID = tmpID
     End If
-
-    doc.async = False
-    doc.loadXML "<ACARSRequest></ACARSRequest>"
-    Set root = doc.documentElement
     
-    'Set ACARS version and request ID attributes.
+    'Create the document
+    Set doc = New DOMDocument
+    Set pi = doc.createProcessingInstruction("xml", "version='1.0' encoding='ISO-8859-1'")
+    doc.insertBefore pi, doc.firstChild
+
+    'Create the root element
+    Set root = doc.createNode(NODE_ELEMENT, "ACARSRequest", "")
     root.setAttribute "version", ACARSVERSION
     root.setAttribute "id", Hex(ReqID)
+    doc.appendChild root
     HasData = False
 End Sub
 
@@ -62,11 +66,10 @@ Public Sub Queue(cmd As IXMLDOMElement)
 End Sub
 
 Public Sub Send()
-    'Set error handler
     On Error GoTo EH
-
+    
     'Send the data
-    frmMain.wsckMain.SendData "<?xml version=""1.0"" encoding=""UTF-8"" ?>" & doc.XML
+    frmMain.wsckMain.SendData doc.XML
     LastSendTime = Now
     HasData = False
     If config.ShowDebug Then
@@ -82,4 +85,3 @@ EH:
     MsgBox "The following error occurred: " & err.Description & " (" & err.Number & ")", vbOKOnly Or vbCritical, "tmrRequest.Error"
     Resume ExitSub
 End Sub
-

@@ -16,7 +16,7 @@ Private tankSizeOffsets As Variant
 'Flight phase constants
 Public Const UNKNOWN = 0
 Public Const PREFLIGHT = 1
-Public Const PushBack = 2
+Public Const PUSHBACK = 2
 Public Const TAXI_OUT = 3
 Public Const TAKEOFF = 4
 Public Const AIRBORNE = 5
@@ -276,7 +276,7 @@ data.AngleOfAttack = 100 - (100# * AofA / 32767)
 'Calculate Altitude AGL/MSL
 65 terrElevation = (terrElevation * 3.28084) / 256
 data.AltitudeMSL = altMSL * 3.28084
-data.AltitudeAGL = data.AltitudeMSL - terrElevation
+data.AltitudeAGL = data.AltitudeMSL - terrElevation - aInfo.BaseAGL
 
 'Calculate heading
 66 magVar = magVar * 360# / 65536#
@@ -349,7 +349,7 @@ data.Parked = (isParkBrake = 32767)
 data.onGround = (isOnGround = 1)
 data.Spoilers = (Spoilers = 4800)
 data.GearDown = (gearPos > 8192)
-data.PushBack = (isPushBack <> 3)
+data.PUSHBACK = (isPushBack <> 3)
 data.AP_GPS = isAP And (NAVmode = 1) And (GPSmode = 1)
 data.AP_NAV = isAP And (NAVmode = 1) And (GPSmode = 0)
 data.AP_HDG = isAP And (HDGmode = 1)
@@ -384,8 +384,8 @@ Public Function PhaseChanged(cPos As PositionData) As Boolean
     Select Case info.FlightPhase
         Case PREFLIGHT
             'If the parking brake is released, we enter the Pushback phase.
-            If cPos.PushBack Then
-                info.FlightPhase = PushBack
+            If cPos.PUSHBACK Then
+                info.FlightPhase = PUSHBACK
                 TakeoffCheckCount = 0
                 PhaseChanged = True
                 ShowWeight cPos.weight, cPos.fuel
@@ -400,9 +400,9 @@ Public Function PhaseChanged(cPos As PositionData) As Boolean
                 ShowFSMessage "Starting Taxi", True, 5
             End If
         
-        Case PushBack
+        Case PUSHBACK
             'If we are moving forward, we enter the Taxi Out phase.
-            If Not cPos.PushBack Then
+            If Not cPos.PUSHBACK Then
                 info.FlightPhase = TAXI_OUT
                 info.TaxiOutTime.LocalTime = Now
                 info.TaxiFuel = cPos.fuel
@@ -484,9 +484,10 @@ Public Function PhaseChanged(cPos As PositionData) As Boolean
             If (cPos.GroundSpeed < 30) Then
                 info.FlightPhase = TAXI_IN
                 info.TaxiInTime.LocalTime = Now
+                info.FlightData = True
                 If config.SB3Connected Then SB3Transponder False
                 PhaseChanged = True
-            ElseIf (Not cPos.onGround And (cPos.AltitudeAGL > 7)) Then
+            ElseIf (Not cPos.onGround And (cPos.AltitudeAGL > 3)) Then
                 info.FlightPhase = AIRBORNE
                 If config.SB3Connected Then SB3Transponder True
                 PhaseChanged = True
@@ -499,7 +500,6 @@ Public Function PhaseChanged(cPos As PositionData) As Boolean
                 info.GateTime.LocalTime = Now
                 info.GateFuel = cPos.fuel
                 info.GateWeight = cPos.weight
-                info.FlightData = True
                 PhaseChanged = True
             End If
 
@@ -635,7 +635,7 @@ End Sub
 Private Function UpdateJetPosInterval() As Integer
     If ((info.FlightPhase = PREFLIGHT) Or (info.FlightPhase = ATGATE) Or (info.FlightPhase = SHUTDOWN)) Then
         UpdateJetPosInterval = 90
-    ElseIf (info.FlightPhase = PushBack) Then
+    ElseIf (info.FlightPhase = PUSHBACK) Then
         UpdateJetPosInterval = 20
     ElseIf ((info.FlightPhase = TAXI_OUT) Or (info.FlightPhase = TAXI_IN)) Then
         UpdateJetPosInterval = 10
@@ -659,7 +659,7 @@ End Function
 Private Function UpdateTurbopropPosInterval() As Integer
     If ((info.FlightPhase = PREFLIGHT) Or (info.FlightPhase = ATGATE) Or (info.FlightPhase = SHUTDOWN)) Then
         UpdateTurbopropPosInterval = 90
-    ElseIf (info.FlightPhase = PushBack) Then
+    ElseIf (info.FlightPhase = PUSHBACK) Then
         UpdateTurbopropPosInterval = 20
     ElseIf ((info.FlightPhase = TAXI_OUT) Or (info.FlightPhase = TAXI_IN)) Then
         UpdateTurbopropPosInterval = 10
@@ -724,7 +724,7 @@ Public Function GetAircraftInfo() As AircraftInfo
     If airInfo.HasAfterburner Then ShowMessage "Afterburner detected", ACARSTEXTCOLOR
     
     'Load the ICAO/IATA code
-    airInfo.Code = UCase(ReadINI("General", "atc_model", "", airInfo.CFGFile))
+    airInfo.code = UCase(ReadINI("General", "atc_model", "", airInfo.CFGFile))
     
     'Display conditions
     If config.ShowDebug Then
@@ -759,6 +759,10 @@ End Function
 
 Public Function IsFSRunning() As Boolean
     IsFSRunning = (FindWindow("FS98MAIN", vbNullString) <> 0)
+    If Not IsFSRunning And config.FSUIPCConnected Then
+        FSUIPC_Close
+        config.FSUIPCConnected = False
+    End If
 End Function
 
 Public Function IsFSReady() As Boolean

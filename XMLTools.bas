@@ -24,11 +24,11 @@ Public Function ParseNumber(num As String) As Double
     ParseNumber = CDbl(Replace(num, ".", config.DecimalSeparator))
 End Function
 
-Public Sub AddXMLField(objNode As IXMLDOMElement, Name As String, value As String, Optional doCDATA As Boolean = True)
+Public Sub AddXMLField(objNode As IXMLDOMElement, name As String, value As String, Optional doCDATA As Boolean = True)
     Dim objNewNode As IXMLDOMElement
     Dim objCDATA As IXMLDOMCDATASection
 
-    Set objNewNode = objNode.ownerDocument.createNode(NODE_ELEMENT, Name, "")
+    Set objNewNode = objNode.ownerDocument.createNode(NODE_ELEMENT, name, "")
     If doCDATA Then
         Set objCDATA = objNode.ownerDocument.createCDATASection(value)
         objNewNode.appendChild objCDATA
@@ -39,10 +39,18 @@ Public Sub AddXMLField(objNode As IXMLDOMElement, Name As String, value As Strin
     objNode.appendChild objNewNode
 End Sub
 
-Public Function getChild(node As IXMLDOMNode, Name As String, Optional defVal As String)
+Public Sub AddXMLChild(objNode As IXMLDOMElement, name As String, subName As String, value As String, Optional doCDATA As Boolean = False)
+    Dim subNode As IXMLDOMElement
+    
+    Set subNode = objNode.ownerDocument.createNode(NODE_ELEMENT, name, "")
+    AddXMLField subNode, subName, value, doCDATA
+    objNode.appendChild subNode
+End Sub
+
+Public Function getChild(node As IXMLDOMNode, name As String, Optional defVal As String)
     Dim e As IXMLDOMNode
 
-    Set e = node.selectSingleNode(Name)
+    Set e = node.selectSingleNode(name)
     If (e Is Nothing) Then
         getChild = defVal
     Else
@@ -50,10 +58,10 @@ Public Function getChild(node As IXMLDOMNode, Name As String, Optional defVal As
     End If
 End Function
 
-Public Function getAttr(node As IXMLDOMNode, Name As String, Optional defVal As String)
+Public Function getAttr(node As IXMLDOMNode, name As String, Optional defVal As String)
     Dim e As IXMLDOMAttribute
     
-    Set e = node.Attributes.getNamedItem(Name)
+    Set e = node.Attributes.getNamedItem(name)
     If (e Is Nothing) Then
         getAttr = defVal
     Else

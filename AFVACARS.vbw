@@ -1,4 +1,4 @@
-frmMain = 44, 58, 893, 848, C, 44, 58, 719, 796, C
+frmMain = 44, 58, 893, 848, , 44, 58, 719, 796, C
 frmResume = 0, 0, 0, 0, C, 88, 116, 763, 741, C
 frmCharts = 0, 0, 0, 0, C, 110, 145, 785, 770, C
 FSUIPC = 0, 0, 0, 0, C
@@ -34,3 +34,9 @@ UTCDate = 0, 0, 0, 0, C
 TSRemote = 0, 0, 0, 0, C
 ACKBuffer = 0, 0, 0, 0, C
 Airline = 0, 0, 0, 0, C
+DataExport = 110, 145, 780, 770, 
+KMLColor = 0, 0, 0, 0, C
+GeoPosition = 0, 0, 0, 0, C
+ZipClass = 0, 0, 0, 0, C
+ZipFile = 0, 0, 0, 0, C
+KMLTools = 0, 0, 0, 0, C

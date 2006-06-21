@@ -17,13 +17,15 @@ Public PMDG737 As Boolean
 Public PMDG747 As Boolean
 Public LDS767 As Boolean
 Public Payne7X7 As Boolean
+
 Public HasAfterburner As Boolean
+Private acAGL As Integer
 
 Public FSPath As String
 Private airP As String
 Private airF As String
 
-Public Code As String
+Public code As String
 
 Public Sub Class_Initialize()
     PMDG737 = False
@@ -31,6 +33,7 @@ Public Sub Class_Initialize()
     LDS767 = False
     Payne7X7 = False
     HasAfterburner = False
+    acAGL = -1
 End Sub
 
 Property Let AirPath(ByVal path As String)
@@ -55,4 +58,12 @@ End Property
 
 Property Get AircraftPath() As String
     AircraftPath = airP
+End Property
+
+Property Get BaseAGL() As Integer
+    BaseAGL = acAGL
+End Property
+
+Property Let BaseAGL(ByVal agl As Integer)
+    If (acAGL = -1) Then acAGL = agl
 End Property

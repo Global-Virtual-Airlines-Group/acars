@@ -103,16 +103,14 @@ End Sub
 Public Sub SB3Plan_Save()
     Dim planFileName As String
     
-    On Error GoTo FatalError
-    
-    'Get the path
-    frmMain.CommonDialog1.FileName = frmMain.CommonDialog1.InitDir + info.airportD.ICAO + "-" + info.AirportA.ICAO + ".sfp"
-
-    'Set dialog options
-    frmMain.CommonDialog1.CancelError = True
-    frmMain.CommonDialog1.DialogTitle = "Save Squawkbox 3 Flight Plan"
-    frmMain.CommonDialog1.Filter = "Squawkbox 3 Flight Plans (*.sfp)|*.sfp"
-    frmMain.CommonDialog1.Flags = cdlOFNHideReadOnly
+    'Get the path/dialog options
+    With frmMain.CommonDialog1
+        .FileName = frmMain.CommonDialog1.InitDir + info.airportD.ICAO + "-" + info.AirportA.ICAO + ".sfp"
+        .CancelError = True
+        .DialogTitle = "Save Squawkbox 3 Flight Plan"
+        .Filter = "Squawkbox 3 Flight Plans (*.sfp)|*.sfp"
+        .Flags = cdlOFNHideReadOnly + cdlOFNOverwritePrompt
+    End With
     
     'Display the dialog box
     On Error Resume Next
