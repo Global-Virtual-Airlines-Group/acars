@@ -6,9 +6,12 @@ Private Const navRadioReset = 2
 
 Private Function convertNAVCOM(ByVal freq As String) As Integer
     'returns 110.15 as 0x1015
+    Dim freqParts As Variant
     Dim freqTop As Integer
     Dim freqBottom As Integer
     Dim retVal As Integer
+    
+    On Error GoTo FatalError
     
     'Check for empty string
     If (freq = "") Then
@@ -17,16 +20,24 @@ Private Function convertNAVCOM(ByVal freq As String) As Integer
     End If
     
     'Split the frequency
-    freqTop = Fix(CDbl(freq))
-    freqBottom = CInt((CDbl(freq) - freqTop) * 100)
+    freqParts = Split(freq, ".")
+    freqTop = CInt(freqParts(0)) - 100
+    freqBottom = CInt(freqParts(1))
     
     'Convert the fractional part to hex BCD
     retVal = (Int(freqBottom / 10) * 16) + (freqBottom Mod 10)
     
     'Convert the integer part to hex BCD
-    freqTop = freqTop - 100
     retVal = retVal + ((freqTop Mod 10) * 256)
     convertNAVCOM = retVal + (Int(freqTop / 10) * 4096)
+    
+ExitSub:
+    Exit Function
+    
+FatalError:
+    ShowMessage "Error processing Frequency " + freq, ACARSERRORCOLOR
+    Resume ExitSub
+    
 End Function
 
 Private Function convertADF(ByVal freq As String) As Long

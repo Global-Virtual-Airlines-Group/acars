@@ -112,7 +112,6 @@ Public Sub Class_Initialize()
     'Init arrays
     eqTypes = Array("A310", "A318", "A319", "A320", "A321", "A330-200", "A340-300", "ATR-72", "B707-320", "B727-200", "B737-200", "B737-300", "B737-800", "B747-100", "B747-200", "B747-400", "B757-200", "B767-200", "B767-300", "B767-400", "B777-200", "B777-300", "Caravelle", "Comet", "Concorde", "Constellation", "CRJ-200", "CRJ-700", "CV-880", "DC-10-10", "DC-3", "DC-6", "DC-8-11", "DC-8-33", "DC-8-51", "DC-8-61", "DC-8-71", "DC-9-14", "DC-9-32", "DO-328", "EMB-120", "ERJ-135", "ERJ-145", "L-1011", "MD-11", "MD-88", "MD-90")
     airportInfo = Array()
-    Roles = Array()
     Ratings = Array()
     aLines = Array()
 
@@ -120,6 +119,9 @@ Public Sub Class_Initialize()
     ACARS_Host = RegReadString(HKEY_LOCAL_MACHINE, REG_SETTINGS_KEY, "ACARSServerHost", DEFAULT_ACARS_HOST)
     ACARS_Port = RegReadDWORD(HKEY_LOCAL_MACHINE, REG_SETTINGS_KEY, "ACARSServerPort", DEFAULT_ACARS_PORT)
     SeenHELO = False
+    
+    'Load roles
+    Roles = Split(RegReadString(HKEY_CURRENT_USER, REG_SETTINGS_KEY, "UserRoles", "Pilot"), ",")
 
     'Load Local Settings
     frmMain.txtPilotID.Text = RegReadString(HKEY_CURRENT_USER, REG_SETTINGS_KEY, "Pilot ID", "")
@@ -224,13 +226,16 @@ Public Sub UpdateFlightInfo()
     frmMain.cboAirportA.ListIndex = GetAirportOfs(info.AirportA) + 1
     frmMain.cboAirportL.ListIndex = GetAirportOfs(info.AirportL) + 1
     If info.CheckRide Then frmMain.chkCheckRide.value = 1
+    If info.TestFlight Then frmMain.chkTrainFlight.value = 1
 End Sub
 
 Public Sub Save()
-    'Save Flight Data to registry
     RegWriteString HKEY_CURRENT_USER, REG_SETTINGS_KEY, "Pilot ID", frmMain.txtPilotID.Text
     RegWriteString HKEY_CURRENT_USER, REG_SETTINGS_KEY, "Password", IIf(SavePassword, frmMain.txtPassword.Text, "")
     RegWriteString HKEY_LOCAL_MACHINE, REG_SETTINGS_KEY, "SavedFlights", SavedFlightsPath
+    
+    'Save Roles
+    RegWriteString HKEY_CURRENT_USER, REG_SETTINGS_KEY, "UserRoles", Join(Roles, ",")
 
     'Save settings
     RegWriteBoolean HKEY_CURRENT_USER, REG_SETTINGS_KEY, "SavePassword", SavePassword
@@ -378,7 +383,7 @@ Public Function IsConfigUpToDate() As Boolean
     
     'Check for override flag
     If ForceCfgUpdate Then
-        IsConfigUpToDate = True
+        IsConfigUpToDate = False
         Exit Function
     End If
 

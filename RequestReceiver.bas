@@ -129,10 +129,6 @@ Private Sub ProcessACK(cmdNode As IXMLDOMNode)
         frmMain.sbMain.Panels(1).Text = "Status: Logged in to ACARS server"
         frmMain.SSTab1.TabEnabled(1) = True
         frmMain.mnuOptionsFlyOffline.enabled = False
-        If config.TS2Support Then
-            frmMain.SSTab1.TabEnabled(4) = True
-            frmMain.SSTab1.TabVisible(4) = True
-        End If
         
         'Display newer build if available
         newBuild = CInt(getChild(cmdNode, "latestBuild", "0"))
@@ -156,6 +152,16 @@ Private Sub ProcessACK(cmdNode As IXMLDOMNode)
             config.AddRating rName
         Next
         
+        'Check our acces with FS not running
+        Dim NeedsFS As Boolean
+        NeedsFS = Not (config.HasRole("HR") Or config.HasRole("PIREP") Or config.HasRole("Dispatch"))
+        If NeedsFS And Not IsFSRunning Then
+            frmMain.ToggleACARSConnection True
+            MsgBox "Microsoft Flight Simulator must be started before you connect to the ACARS Server.", _
+                vbOKOnly + vbExclamation, "Flight Simulator not started"
+            Exit Sub
+        End If
+        
         'Get unrestricted flag
         config.NoMessages = CBool(getChild(cmdNode, "noMsgs", "false"))
         config.IsUnrestricted = CBool(getChild(cmdNode, "unrestricted", "false")) And Not config.NoMessages
@@ -167,14 +173,20 @@ Private Sub ProcessACK(cmdNode As IXMLDOMNode)
         
         'Update Equipment/Airport comboboxes
         If Not config.IsConfigUpToDate Then
+            ShowMessage "Updating Airport/Airline/Equipment lists", ACARSTEXTCOLOR
             RequestEquipment
             RequestAirports
             RequestAirlines
         End If
         
+        'Request Pilot List/SB3 Privat voice
         If config.SB3Support Then RequestPrivateVoiceURL
         RequestPilotList
-        If (info.InFlight Or info.FlightData) Then info.InfoReqID = SendFlightInfo(info)
+        
+        'Get a flight ID if we have a flight
+        If (info.InFlight Or info.FlightData) And Not info.TestFlight Then info.InfoReqID = SendFlightInfo(info)
+        
+        'Send data
         ReqStack.Send
         DoEvents
     ElseIf (ReqID = info.InfoReqID) Then
@@ -192,7 +204,7 @@ Private Sub ProcessACK(cmdNode As IXMLDOMNode)
         'Check the check ride flag
         isCheckRide = CBool(getChild(cmdNode, "checkRide", "false"))
         If isCheckRide Then
-            isCheckRide = (MsgBox("You have a pending " & info.EquipmentType & " Check Ride" & _
+            isCheckRide = (MsgBox("You have a pending " & info.EquipmentType & " Check Ride." & _
                 vbCrLf & vbCrLf & "Are you flying the Check Ride now?", vbQuestion + vbYesNo, _
                 "Pending Check Ride") = vbYes)
         End If
@@ -380,7 +392,7 @@ Private Sub ProcessDataResponse(cmdNode As IXMLDOMNode)
                         Set oldPilot = users.GetPilot(p.ID)
                         users.AddPilot p
                         If (oldPilot Is Nothing) Then ShowMessage p.name + " (" + p.ID + _
-                            ") logged into the ACARS server.", ACARSTEXTCOLOR
+                            ") logged into the ACARS server.", SYSMSGCOLOR
                     End If
                 Next
                 
@@ -409,7 +421,7 @@ Private Sub ProcessDataResponse(cmdNode As IXMLDOMNode)
                     p.LastName = getChild(pNode, "lastname", "")
 
                     users.DeletePilot p.ID
-                    ShowMessage p.name + " (" + p.ID + ") logged out from the ACARS server.", ACARSTEXTCOLOR
+                    ShowMessage p.name + " (" + p.ID + ") logged out from the ACARS server.", SYSMSGCOLOR
                 Next
                 
                 'Update the Pilot List

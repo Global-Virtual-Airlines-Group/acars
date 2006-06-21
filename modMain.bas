@@ -193,18 +193,34 @@ Public Sub ApplicationStartup()
                 'Load aircraft info
                 Set acInfo = GetAircraftInfo()
             Else
-                MsgBox "ACARS has loaded your old Flight Data, and has enough information to file" & _
-                vbCrLf & "a Flight Report. Please connect to the ACARS server to file your PIREP.", _
-                vbOKOnly + vbInformation, "Flight Restored"
+                If info.TestFlight Then
+                    MsgBox "ACARS has loaded your old Flight Data, and you can export it to Microsoft " & _
+                        "Excel and Google Earth.", vbOKOnly + vbInformation, "Flight Restored"
+                Else
+                    MsgBox "ACARS has loaded your old Flight Data, and has enough information to file" & _
+                        vbCrLf & "a Flight Report. Please connect to the ACARS server to file your PIREP.", _
+                    vbOKOnly + vbInformation, "Flight Restored"
+                End If
             End If
             
             'Reset button states
             With frmMain
                 .LockFlightInfo False
-                .cmdPIREP.visible = True
-                .cmdPIREP.enabled = info.FlightData And config.ACARSConnected
+                .chkCheckRide.enabled = Not info.TestFlight
+                .chkTrainFlight.enabled = Not info.CheckRide
                 .tmrPosUpdates.enabled = info.InFlight
                 .tmrFlightTime.enabled = info.InFlight
+                .tmrStartCheck.enabled = False
+                .cmdPIREP.visible = True
+                If info.TestFlight Then
+                    .cmdPIREP.enabled = info.FlightData
+                    .cmdPIREP.Caption = "Export Data"
+                    .chkTrainFlight.value = 1
+                    .chkTrainFlight.enabled = False
+                Else
+                    .cmdPIREP.enabled = info.FlightData And config.ACARSConnected
+                    If info.CheckRide Then .chkCheckRide.value = 1
+                End If
             End With
         Else
             'Prompt if the user wants to delete the flight
@@ -260,19 +276,26 @@ Public Sub ApplicationStartup()
     End If
     
     'Display the main form.
-    frmMain.Show
-    frmMain.txtCmd.SetFocus
-    If config.FSUIPCConnected Then frmMain.tmrStartCheck.enabled = True
+    With frmMain
+        .Show
+        .txtCmd.SetFocus
+        .MousePointer = vbDefault
+        If config.FSUIPCConnected Then .tmrStartCheck.enabled = True
+    End With
 End Sub
 
 Public Function ConfirmExit() As Boolean
     ConfirmExit = True
-
-    'If we have enough data for a PIREP, but the user hasn't filed
-    'one, confirm that the user wants to quit.
     If info.FlightData And Not info.PIREPFiled Then
-        ConfirmExit = (MsgBox("You have not filed a PIREP for your flight. Are you sure you want to exit?", vbYesNo Or vbQuestion, "Confirm") = vbYes)
-        Exit Function
+        If info.TestFlight Then
+            ConfirmExit = (MsgBox("You have not filed a Flight Report for your flight. " & _
+                "Are you sure you want to exit?", vbYesNo Or vbQuestion, "Confirm") = vbYes)
+        Else
+            ConfirmExit = (MsgBox("You have not saved your flight data from this Training Flight. " & _
+                "Are you sure you want to exit?", vbYesNo Or vbQuestion, "Confirm Exit") = vbYes)
+        End If
+        
+        If Not ConfirmExit Then Exit Function
     End If
 
     'If we're in the middle of a flight, make sure the user really wants to quit.
@@ -282,9 +305,8 @@ Public Function ConfirmExit() As Boolean
     End If
 
     'Prompt user to confirm exit if connected to ACARS server.
-    If config.ACARSConnected Then
-        ConfirmExit = (MsgBox("Are you sure you want to exit?", vbYesNo Or vbQuestion, "Confirm") = vbYes)
-    End If
+    If config.ACARSConnected Then ConfirmExit = (MsgBox("Are you sure you want to exit?", _
+        vbYesNo Or vbQuestion, "Confirm") = vbYes)
 End Function
 
 Public Function FSUIPC_Connect(Optional showError As Boolean = False) As Integer
@@ -524,3 +546,4 @@ End Sub
 Public Sub PlaySoundAlias(ByVal alias As String)
     PlaySound alias, 0, SND_ASYNC And SND_ALIAS
 End Sub
+

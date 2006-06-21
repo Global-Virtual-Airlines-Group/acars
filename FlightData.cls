@@ -16,6 +16,7 @@ Option Explicit
 'Flight information
 Public FlightID As Long
 Public CheckRide As Boolean
+Public TestFlight As Boolean
 
 Public EquipmentType As String
 Public FlightNumber As Integer

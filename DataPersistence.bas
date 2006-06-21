@@ -48,12 +48,13 @@ Public Sub PersistFlightData(Optional writeMsg As Boolean = False)
     If Not (info.AirportL Is Nothing) Then AddXMLField inf, "airportL", info.AirportL.IATA, False
     AddXMLField inf, "route", info.Route
     AddXMLField inf, "remarks", info.Remarks
-    AddXMLField inf, "network", info.Network
+    AddXMLField inf, "network", info.Network, False
     AddXMLField inf, "startTime", FormatDateTime(info.StartTime.UTCTime, "mm/dd/yyyy hh:nn:ss")
     AddXMLField inf, "fs_ver", CStr(info.FSVersion), False
     If info.Offline Then AddXMLField inf, "offline", "true", False
     If (info.FlightPhase = COMPLETE) Then AddXMLField inf, "complete", "true", False
     If info.CheckRide Then AddXMLField inf, "checkRide", "true", False
+    If info.TestFlight Then AddXMLField inf, "trainFlight", "true", False
     
     'Some of these fields may be zero but they should be persisted anyways
     AddXMLField inf, "taxiOutTime", FormatDateTime(info.TaxiOutTime.UTCTime, "mm/dd/yyyy hh:nn:ss")
@@ -215,7 +216,7 @@ Public Function RestoreFlightData(ByVal flightCode As String) As SavedFlight
         MsgBox "The Flight Data appears to have been altered!" + vbCrLf + vbCrLf + _
             "Validation Code = " + shaHash + vbCrLf + "Calculated Code = " + shaCalc, _
             vbCritical + vbOKOnly, "Altered Flight Data"
-        Exit Function
+        GoTo ExitSub
     End If
     
     'Convert into XML document
@@ -230,14 +231,14 @@ Public Function RestoreFlightData(ByVal flightCode As String) As SavedFlight
             & "Source: " & vbCrLf & xmlError.srcText
         MsgBox "The following error occurred while parsing flight data: " & _
             vbCrLf & vbCrLf & strError, vbCritical Or vbOKOnly, "Fatal Error!"
-        Exit Function
+        GoTo ExitSub
     End If
     
     'Get the root element
     Set root = doc.selectSingleNode("flight")
     If (root Is Nothing) Then
         ShowMessage "Invalid Saved Flight - No flight element", ACARSERRORCOLOR
-        Exit Function
+        GoTo ExitSub
     End If
     
     'Validate the build number
@@ -247,7 +248,7 @@ Public Function RestoreFlightData(ByVal flightCode As String) As SavedFlight
         MsgBox "This Flight was saved using Build " & CStr(buildNumber) & ". This version of" & _
             vbCrLf & "the ACARS client can only read Flights saved using Build " & CStr(MIN_BUILD) & _
             " or newer.", vbCritical + vbOKOnly, "Saved Flight Error"
-        Exit Function
+        GoTo ExitSub
     ElseIf (buildNumber > App.Revision) Then
         MsgBox "This Flight was saved using a newer revision (Build " & CStr(buildNumber) & ")" & _
             vbCrLf & "of ACARS. Some saved Flight data may not be loaded.", vbExclamation + vbOKOnly, _
@@ -259,7 +260,7 @@ Public Function RestoreFlightData(ByVal flightCode As String) As SavedFlight
     Set inf = root.selectSingleNode("info")
     If (inf Is Nothing) Then
         ShowMessage "Invalid Saved Flight " + flightCode + " - No Flight Information", ACARSERRORCOLOR
-        Exit Function
+        GoTo ExitSub
     End If
     
     'Load the flight information
@@ -275,6 +276,7 @@ Public Function RestoreFlightData(ByVal flightCode As String) As SavedFlight
         .CruiseAltitude = getChild(inf, "altitude", "3000")
         .Network = getChild(inf, "network", "Offline")
         .CheckRide = CBool(getChild(inf, "checkRide", "false"))
+        .TestFlight = CBool(getChild(inf, "trainFlight", "false"))
         Set .airportD = config.GetAirport(getChild(inf, "airportD", ""))
         Set .AirportA = config.GetAirport(getChild(inf, "airportA", ""))
         Set .AirportL = config.GetAirport(getChild(inf, "airportL", ""))
@@ -451,4 +453,3 @@ Public Function SavedFlightID(fInfo As FlightData) As String
         SavedFlightID = "O-" + Format(info.StartTime.UTCTime, "yyyymmddhh")
     End If
 End Function
-
