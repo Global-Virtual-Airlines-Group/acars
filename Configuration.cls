@@ -16,6 +16,7 @@ Option Explicit
 'Registry settings key
 Private Const REG_ROOT_KEY = "SOFTWARE\Delta Virtual Airlines"
 Private Const REG_SETTINGS_KEY = "SOFTWARE\Delta Virtual Airlines\ACARS"
+Private Const FAIL_SETTINGS_KEY = "SOFTWARE\Delta Virtual Airlines\ACARS\Failures"
 Private Const INT_FORMAT_KEY = "Control Panel\International"
 
 'Airport configuration file
@@ -37,9 +38,18 @@ Private aLines As Variant
 Private eqTypes As Variant
 Private airportInfo As Variant
 
+'Failure mode support
+Public FailuresEnabled As Boolean
+Public FailuresSilent As Boolean
+Public FailureConfig As Failures
+
+'Cold and Dark support
+Public ColdDark As Boolean
+
 'Flight state data
 Public FSUIPCConnected As Boolean
 Public ACARSConnected As Boolean
+Public WideFSConnected As Boolean
 Public SeenHELO As Boolean
 
 'Decimal/date/time separators
@@ -79,9 +89,6 @@ Public SB3Support As Boolean
 Public SB3Installed As Boolean
 Public SB3Connected As Boolean
 
-'TeamSpeak support info
-Public TS2Support As Boolean
-
 Public PrivateVoiceURL As String
 Public MsgReceived As Boolean
 Public Busy As Boolean
@@ -98,16 +105,15 @@ Private Const CSIDL_APPDATA = &H1A&
 Private Const CSIDL_LOCAL_APPDATA = &H1C&
 
 'Win32 API functions to get My Docs folder
-'Private Declare Function lstrlenW Lib "kernel32" (ByVal lpString As Long) As Long
 Private Declare Function SHGetFolderPath Lib "shfolder.dll" Alias "SHGetFolderPathA" _
   (ByVal hWnd As Long, ByVal nFolder As Long, ByVal hToken As Long, ByVal dwReserved As Long, _
   ByVal lpszPath As String) As Long
 
 Public Sub Class_Initialize()
     'Load the decimal/date separator
-    DecimalSeparator = RegReadString(HKEY_CURRENT_USER, INT_FORMAT_KEY, "sDecimal", ".")
-    DateSeparator = RegReadString(HKEY_CURRENT_USER, INT_FORMAT_KEY, "sDate", "/")
-    TimeSeparator = RegReadString(HKEY_CURRENT_USER, INT_FORMAT_KEY, "sTime", ":")
+    DecimalSeparator = RegReadString(HKCU, INT_FORMAT_KEY, "sDecimal", ".")
+    DateSeparator = RegReadString(HKCU, INT_FORMAT_KEY, "sDate", "/")
+    TimeSeparator = RegReadString(HKCU, INT_FORMAT_KEY, "sTime", ":")
 
     'Init arrays
     eqTypes = Array("A310", "A318", "A319", "A320", "A321", "A330-200", "A340-300", "ATR-72", "B707-320", "B727-200", "B737-200", "B737-300", "B737-800", "B747-100", "B747-200", "B747-400", "B757-200", "B767-200", "B767-300", "B767-400", "B777-200", "B777-300", "Caravelle", "Comet", "Concorde", "Constellation", "CRJ-200", "CRJ-700", "CV-880", "DC-10-10", "DC-3", "DC-6", "DC-8-11", "DC-8-33", "DC-8-51", "DC-8-61", "DC-8-71", "DC-9-14", "DC-9-32", "DO-328", "EMB-120", "ERJ-135", "ERJ-145", "L-1011", "MD-11", "MD-88", "MD-90")
@@ -116,20 +122,20 @@ Public Sub Class_Initialize()
     aLines = Array()
 
     'Load Global Settings
-    ACARS_Host = RegReadString(HKEY_LOCAL_MACHINE, REG_SETTINGS_KEY, "ACARSServerHost", DEFAULT_ACARS_HOST)
-    ACARS_Port = RegReadDWORD(HKEY_LOCAL_MACHINE, REG_SETTINGS_KEY, "ACARSServerPort", DEFAULT_ACARS_PORT)
+    ACARS_Host = RegReadString(HKLM, REG_SETTINGS_KEY, "ACARSServerHost", DEFAULT_ACARS_HOST)
+    ACARS_Port = RegReadDWORD(HKLM, REG_SETTINGS_KEY, "ACARSServerPort", DEFAULT_ACARS_PORT)
     SeenHELO = False
     
     'Load roles
-    Roles = Split(RegReadString(HKEY_CURRENT_USER, REG_SETTINGS_KEY, "UserRoles", "Pilot"), ",")
+    Roles = Split(RegReadString(HKCU, REG_SETTINGS_KEY, "UserRoles", "Pilot"), ",")
 
     'Load Local Settings
-    frmMain.txtPilotID.Text = RegReadString(HKEY_CURRENT_USER, REG_SETTINGS_KEY, "Pilot ID", "")
-    frmMain.txtPassword.Text = RegReadString(HKEY_CURRENT_USER, REG_SETTINGS_KEY, "Password", "")
+    frmMain.txtPilotID.Text = RegReadString(HKCU, REG_SETTINGS_KEY, "Pilot ID", "")
+    frmMain.txtPassword.Text = RegReadString(HKCU, REG_SETTINGS_KEY, "Password", "")
     
     'Load the Pilot ID from alternate source if not found
     If (frmMain.txtPilotID.Text = "") Then
-        frmMain.txtPilotID.Text = RegReadString(HKEY_CURRENT_USER, REG_ROOT_KEY, "Pilot ID", "")
+        frmMain.txtPilotID.Text = RegReadString(HKCU, REG_ROOT_KEY, "Pilot ID", "")
     End If
 
     'Set intervals in seconds
@@ -140,29 +146,58 @@ Public Sub Class_Initialize()
     SB3Installed = SB3InstallCheck()
     
     'Check for config update flag
-    ForceCfgUpdate = RegReadBoolean(HKEY_LOCAL_MACHINE, REG_SETTINGS_KEY, "UpdateConfig", False)
+    ForceCfgUpdate = RegReadBoolean(HKLM, REG_SETTINGS_KEY, "UpdateConfig", False)
     
     'Load saved flight path
-    SavedFlightsPath = RegReadString(HKEY_LOCAL_MACHINE, REG_SETTINGS_KEY, "SavedFlights", "")
+    SavedFlightsPath = RegReadString(HKLM, REG_SETTINGS_KEY, "SavedFlights", "")
 
     'Load menu options
-    SavePassword = RegReadBoolean(HKEY_CURRENT_USER, REG_SETTINGS_KEY, "SavePassword", True)
-    ShowPilotNames = RegReadBoolean(HKEY_CURRENT_USER, REG_SETTINGS_KEY, "ShowUserNames", False)
-    HideMessagesWhenBusy = RegReadBoolean(HKEY_CURRENT_USER, REG_SETTINGS_KEY, "HideMessagesWhenBusy", False)
-    HideWhenMinimized = RegReadBoolean(HKEY_CURRENT_USER, REG_SETTINGS_KEY, "HideOnMinimize", False)
-    SterileCockpit = RegReadBoolean(HKEY_CURRENT_USER, REG_SETTINGS_KEY, "SterileCockpit", False)
-    PlaySound = RegReadBoolean(HKEY_LOCAL_MACHINE, REG_SETTINGS_KEY, "PlaySoundForChat", True)
-    FlyOffline = RegReadBoolean(HKEY_LOCAL_MACHINE, REG_SETTINGS_KEY, "FlyOffline", False)
-    GaugeSupport = RegReadBoolean(HKEY_LOCAL_MACHINE, REG_SETTINGS_KEY, "GaugeIntegration", False)
-    FreezeWindow = RegReadBoolean(HKEY_CURRENT_USER, REG_SETTINGS_KEY, "FreezeWindow", False)
-    ShowTimestamps = RegReadBoolean(HKEY_LOCAL_MACHINE, REG_SETTINGS_KEY, "ShowTimestamps", True)
-    DisableAutoSave = RegReadBoolean(HKEY_CURRENT_USER, REG_SETTINGS_KEY, "DisableAutoSave", False)
-    ShowDebug = RegReadBoolean(HKEY_LOCAL_MACHINE, REG_SETTINGS_KEY, "ShowDebug", False)
-    WideFSInstalled = RegReadBoolean(HKEY_LOCAL_MACHINE, REG_SETTINGS_KEY, "WideFS", False)
-    TS2Support = RegReadBoolean(HKEY_LOCAL_MACHINE, REG_SETTINGS_KEY, "TS2Support", False) '_
-        'And TS2Installed
-    SB3Support = RegReadBoolean(HKEY_LOCAL_MACHINE, REG_SETTINGS_KEY, "SB3Support", False) _
-        And (SB3Installed Or WideFSInstalled)
+    SavePassword = RegReadBoolean(HKCU, REG_SETTINGS_KEY, "SavePassword", True)
+    ShowPilotNames = RegReadBoolean(HKCU, REG_SETTINGS_KEY, "ShowUserNames", False)
+    HideMessagesWhenBusy = RegReadBoolean(HKCU, REG_SETTINGS_KEY, "HideMessagesWhenBusy", False)
+    HideWhenMinimized = RegReadBoolean(HKCU, REG_SETTINGS_KEY, "HideOnMinimize", False)
+    SterileCockpit = RegReadBoolean(HKCU, REG_SETTINGS_KEY, "SterileCockpit", False)
+    PlaySound = RegReadBoolean(HKLM, REG_SETTINGS_KEY, "PlaySoundForChat", True)
+    FlyOffline = RegReadBoolean(HKLM, REG_SETTINGS_KEY, "FlyOffline", False)
+    GaugeSupport = RegReadBoolean(HKLM, REG_SETTINGS_KEY, "GaugeIntegration", False)
+    FreezeWindow = RegReadBoolean(HKCU, REG_SETTINGS_KEY, "FreezeWindow", False)
+    ShowTimestamps = RegReadBoolean(HKLM, REG_SETTINGS_KEY, "ShowTimestamps", True)
+    DisableAutoSave = RegReadBoolean(HKCU, REG_SETTINGS_KEY, "DisableAutoSave", False)
+    ShowDebug = RegReadBoolean(HKLM, REG_SETTINGS_KEY, "ShowDebug", False)
+    WideFSInstalled = RegReadBoolean(HKLM, REG_SETTINGS_KEY, "WideFS", False)
+    FailuresEnabled = RegReadBoolean(HKCU, REG_SETTINGS_KEY, "Failures", False)
+    FailuresSilent = RegReadBoolean(HKCU, REG_SETTINGS_KEY, "SilentFailure", False)
+    ColdDark = RegReadBoolean(HKCU, REG_SETTINGS_KEY, "ColdDark", False)
+    SB3Support = RegReadBoolean(HKLM, REG_SETTINGS_KEY, "SB3Support", False) And (SB3Installed Or WideFSInstalled)
+    
+    'Load Failure options
+    Set FailureConfig = New Failures
+    FailureConfig.InstrumentFailureProbability = RegReadDWORD(HKCU, FAIL_SETTINGS_KEY, "InstProbability", 0)
+    FailureConfig.EquipmentFailureProbability = RegReadDWORD(HKCU, FAIL_SETTINGS_KEY, "EQProbability", 0)
+    FailureConfig.ADF = RegReadBoolean(HKCU, FAIL_SETTINGS_KEY, "ADF", False)
+    FailureConfig.Airspeed = RegReadBoolean(HKCU, FAIL_SETTINGS_KEY, "Airspeed", False)
+    FailureConfig.Altimeter = RegReadBoolean(HKCU, FAIL_SETTINGS_KEY, "Altimeter", False)
+    FailureConfig.Attitude = RegReadBoolean(HKCU, FAIL_SETTINGS_KEY, "Attitude", False)
+    FailureConfig.COM1 = RegReadBoolean(HKCU, FAIL_SETTINGS_KEY, "COM1", False)
+    FailureConfig.COM2 = RegReadBoolean(HKCU, FAIL_SETTINGS_KEY, "COM2", False)
+    FailureConfig.Compass = RegReadBoolean(HKCU, FAIL_SETTINGS_KEY, "Compass", False)
+    FailureConfig.Fuel = RegReadBoolean(HKCU, FAIL_SETTINGS_KEY, "Fuel", False)
+    FailureConfig.NAV1 = RegReadBoolean(HKCU, FAIL_SETTINGS_KEY, "NAV1", False)
+    FailureConfig.NAV2 = RegReadBoolean(HKCU, FAIL_SETTINGS_KEY, "NAV2", False)
+    FailureConfig.Transponder = RegReadBoolean(HKCU, FAIL_SETTINGS_KEY, "Transponder", False)
+    FailureConfig.VerticalSpeed = RegReadBoolean(HKCU, FAIL_SETTINGS_KEY, "VSI", False)
+    FailureConfig.Flaps = RegReadBoolean(HKCU, FAIL_SETTINGS_KEY, "Flaps", False)
+    FailureConfig.Spoilers = RegReadBoolean(HKCU, FAIL_SETTINGS_KEY, "Spoilers", False)
+    FailureConfig.Gear = RegReadBoolean(HKCU, FAIL_SETTINGS_KEY, "Gear", False)
+    FailureConfig.PitotHeat = RegReadBoolean(HKCU, FAIL_SETTINGS_KEY, "PitotHeat", False)
+    FailureConfig.SetEngineFailure 1, RegReadBoolean(HKCU, FAIL_SETTINGS_KEY, "Engine1", False)
+    FailureConfig.SetEngineFailure 2, RegReadBoolean(HKCU, FAIL_SETTINGS_KEY, "Engine2", False)
+    FailureConfig.SetEngineFailure 3, RegReadBoolean(HKCU, FAIL_SETTINGS_KEY, "Engine3", False)
+    FailureConfig.SetEngineFailure 4, RegReadBoolean(HKCU, FAIL_SETTINGS_KEY, "Engine4", False)
+    FailureConfig.SetReverserFailure 1, RegReadBoolean(HKCU, FAIL_SETTINGS_KEY, "Rev1", False)
+    FailureConfig.SetReverserFailure 2, RegReadBoolean(HKCU, FAIL_SETTINGS_KEY, "Rev2", False)
+    FailureConfig.SetReverserFailure 3, RegReadBoolean(HKCU, FAIL_SETTINGS_KEY, "Rev3", False)
+    FailureConfig.SetReverserFailure 4, RegReadBoolean(HKCU, FAIL_SETTINGS_KEY, "Rev4", False)
 End Sub
 
 Property Get IsFS9() As Boolean
@@ -200,18 +235,20 @@ Public Sub UpdateSettingsMenu()
         .mnuOptionsGaugeIntegration.Checked = GaugeSupport
         .mnuOptionsShowDebugMessages.Checked = ShowDebug
         .mnuOptionsHide.Checked = HideWhenMinimized
+        .mnuOptionsColdDark.Checked = ColdDark
         .mnuCOMHideBusy.Checked = HideMessagesWhenBusy
         .mnuCOMFreezeWindow.Checked = FreezeWindow
         .mnuCOMSterileCockpit.Checked = SterileCockpit
-        .mnuOptionsSB3Support.enabled = SB3Installed Or WideFSInstalled
+        .mnuOptionsSB3Support.Enabled = SB3Installed Or WideFSInstalled
         .mnuOptionsSB3Support.Checked = SB3Support
-        .mnuOptionsTS2Support.enabled = False 'TS2Installed And False
-        .mnuOptionsTS2Support.Checked = TS2Support
         .mnuOptionsWideFS.Checked = WideFSInstalled
         .mnuOptionsDisableAutoSave.Checked = DisableAutoSave
+        .mnuFailuresEnabled.Checked = FailuresEnabled
+        .mnuFailuresSilent.Checked = FailuresSilent
+        .mnuFailures.Enabled = info.TestFlight
         
         'Update SB3 support
-        .mnuSaveFlightPlan.enabled = SB3Support
+        .mnuSaveFlightPlan.Enabled = SB3Support
         .SSTab1.TabVisible(3) = ShowDebug
     End With
 End Sub
@@ -230,28 +267,62 @@ Public Sub UpdateFlightInfo()
 End Sub
 
 Public Sub Save()
-    RegWriteString HKEY_CURRENT_USER, REG_SETTINGS_KEY, "Pilot ID", frmMain.txtPilotID.Text
-    RegWriteString HKEY_CURRENT_USER, REG_SETTINGS_KEY, "Password", IIf(SavePassword, frmMain.txtPassword.Text, "")
-    RegWriteString HKEY_LOCAL_MACHINE, REG_SETTINGS_KEY, "SavedFlights", SavedFlightsPath
+    RegWriteString HKCU, REG_SETTINGS_KEY, "Pilot ID", frmMain.txtPilotID.Text
+    RegWriteString HKCU, REG_SETTINGS_KEY, "Password", IIf(SavePassword, frmMain.txtPassword.Text, "")
+    RegWriteString HKLM, REG_SETTINGS_KEY, "SavedFlights", SavedFlightsPath
     
     'Save Roles
-    RegWriteString HKEY_CURRENT_USER, REG_SETTINGS_KEY, "UserRoles", Join(Roles, ",")
+    RegWriteString HKCU, REG_SETTINGS_KEY, "UserRoles", Join(Roles, ",")
 
     'Save settings
-    RegWriteBoolean HKEY_CURRENT_USER, REG_SETTINGS_KEY, "SavePassword", SavePassword
-    RegWriteBoolean HKEY_LOCAL_MACHINE, REG_SETTINGS_KEY, "PlaySoundForChat", PlaySound
-    RegWriteBoolean HKEY_LOCAL_MACHINE, REG_SETTINGS_KEY, "GaugeIntegration", GaugeSupport
-    RegWriteBoolean HKEY_LOCAL_MACHINE, REG_SETTINGS_KEY, "FlyOffline", FlyOffline
-    RegWriteBoolean HKEY_LOCAL_MACHINE, REG_SETTINGS_KEY, "ShowTimestamps", ShowTimestamps
-    RegWriteBoolean HKEY_CURRENT_USER, REG_SETTINGS_KEY, "FreezeWindow", FreezeWindow
-    RegWriteBoolean HKEY_LOCAL_MACHINE, REG_SETTINGS_KEY, "ShowDebug", ShowDebug
-    RegWriteBoolean HKEY_CURRENT_USER, REG_SETTINGS_KEY, "HideOnMinimize", HideWhenMinimized
-    RegWriteBoolean HKEY_CURRENT_USER, REG_SETTINGS_KEY, "HideMessagesWhenBusy", HideMessagesWhenBusy
-    RegWriteBoolean HKEY_CURRENT_USER, REG_SETTINGS_KEY, "SterileCockpit", SterileCockpit
-    RegWriteBoolean HKEY_CURRENT_USER, REG_SETTINGS_KEY, "DisableAutoSave", DisableAutoSave
-    RegWriteBoolean HKEY_LOCAL_MACHINE, REG_SETTINGS_KEY, "WideFS", WideFSInstalled
-    RegWriteBoolean HKEY_LOCAL_MACHINE, REG_SETTINGS_KEY, "SB3Support", SB3Support
-    RegWriteBoolean HKEY_LOCAL_MACHINE, REG_SETTINGS_KEY, "TS2Support", TS2Support
+    RegWriteBoolean HKCU, REG_SETTINGS_KEY, "SavePassword", SavePassword
+    RegWriteBoolean HKLM, REG_SETTINGS_KEY, "PlaySoundForChat", PlaySound
+    RegWriteBoolean HKLM, REG_SETTINGS_KEY, "GaugeIntegration", GaugeSupport
+    RegWriteBoolean HKLM, REG_SETTINGS_KEY, "FlyOffline", FlyOffline
+    RegWriteBoolean HKLM, REG_SETTINGS_KEY, "ShowTimestamps", ShowTimestamps
+    RegWriteBoolean HKCU, REG_SETTINGS_KEY, "FreezeWindow", FreezeWindow
+    RegWriteBoolean HKLM, REG_SETTINGS_KEY, "ShowDebug", ShowDebug
+    RegWriteBoolean HKCU, REG_SETTINGS_KEY, "HideOnMinimize", HideWhenMinimized
+    RegWriteBoolean HKCU, REG_SETTINGS_KEY, "HideMessagesWhenBusy", HideMessagesWhenBusy
+    RegWriteBoolean HKCU, REG_SETTINGS_KEY, "SterileCockpit", SterileCockpit
+    RegWriteBoolean HKCU, REG_SETTINGS_KEY, "DisableAutoSave", DisableAutoSave
+    RegWriteBoolean HKLM, REG_SETTINGS_KEY, "WideFS", WideFSInstalled
+    RegWriteBoolean HKLM, REG_SETTINGS_KEY, "SB3Support", SB3Support
+    RegWriteBoolean HKCU, REG_SETTINGS_KEY, "ColdDark", ColdDark
+    
+    'Write failure settings
+    RegWriteBoolean HKCU, REG_SETTINGS_KEY, "Failures", FailuresEnabled
+    RegWriteBoolean HKCU, REG_SETTINGS_KEY, "SilentFailure", FailuresSilent
+    RegWriteDWORD HKCU, FAIL_SETTINGS_KEY, "MaxFailures", FailureConfig.MaxFailures
+    RegWriteDWORD HKCU, FAIL_SETTINGS_KEY, "InstProbability", FailureConfig.InstrumentFailureProbability
+    RegWriteDWORD HKCU, FAIL_SETTINGS_KEY, "EQProbability", FailureConfig.EquipmentFailureProbability
+    
+    'Write Failure configuration settings
+    RegWriteBoolean HKCU, FAIL_SETTINGS_KEY, "ADF", FailureConfig.ADF
+    RegWriteBoolean HKCU, FAIL_SETTINGS_KEY, "Airspeed", FailureConfig.Airspeed
+    RegWriteBoolean HKCU, FAIL_SETTINGS_KEY, "Altimeter", FailureConfig.Altimeter
+    RegWriteBoolean HKCU, FAIL_SETTINGS_KEY, "Attitude", FailureConfig.Attitude
+    RegWriteBoolean HKCU, FAIL_SETTINGS_KEY, "COM1", FailureConfig.COM1
+    RegWriteBoolean HKCU, FAIL_SETTINGS_KEY, "COM2", FailureConfig.COM2
+    RegWriteBoolean HKCU, FAIL_SETTINGS_KEY, "Compass", FailureConfig.Compass
+    RegWriteBoolean HKCU, FAIL_SETTINGS_KEY, "Fuel", FailureConfig.Fuel
+    RegWriteBoolean HKCU, FAIL_SETTINGS_KEY, "NAV1", FailureConfig.NAV1
+    RegWriteBoolean HKCU, FAIL_SETTINGS_KEY, "NAV2", FailureConfig.NAV2
+    RegWriteBoolean HKCU, FAIL_SETTINGS_KEY, "Transponder", FailureConfig.Transponder
+    RegWriteBoolean HKCU, FAIL_SETTINGS_KEY, "VSI", FailureConfig.VerticalSpeed
+    
+    RegWriteBoolean HKCU, FAIL_SETTINGS_KEY, "Flaps", FailureConfig.Flaps
+    RegWriteBoolean HKCU, FAIL_SETTINGS_KEY, "Spoilers", FailureConfig.Spoilers
+    RegWriteBoolean HKCU, FAIL_SETTINGS_KEY, "Gear", FailureConfig.Gear
+    RegWriteBoolean HKCU, FAIL_SETTINGS_KEY, "PitotHeat", FailureConfig.PitotHeat
+    RegWriteBoolean HKCU, FAIL_SETTINGS_KEY, "Engine1", FailureConfig.EngineFailure(1)
+    RegWriteBoolean HKCU, FAIL_SETTINGS_KEY, "Engine2", FailureConfig.EngineFailure(2)
+    RegWriteBoolean HKCU, FAIL_SETTINGS_KEY, "Engine3", FailureConfig.EngineFailure(3)
+    RegWriteBoolean HKCU, FAIL_SETTINGS_KEY, "Engine4", FailureConfig.EngineFailure(4)
+    RegWriteBoolean HKCU, FAIL_SETTINGS_KEY, "Rev1", FailureConfig.ReverserFailure(1)
+    RegWriteBoolean HKCU, FAIL_SETTINGS_KEY, "Rev2", FailureConfig.ReverserFailure(2)
+    RegWriteBoolean HKCU, FAIL_SETTINGS_KEY, "Rev3", FailureConfig.ReverserFailure(3)
+    RegWriteBoolean HKCU, FAIL_SETTINGS_KEY, "Rev4", FailureConfig.ReverserFailure(4)
 End Sub
 
 Property Get ACARSHost() As String
@@ -274,7 +345,7 @@ Property Get AirportNames() As Variant
     ReDim result(UBound(airportInfo))
     For x = 0 To UBound(airportInfo)
         Set a = airportInfo(x)
-        result(x) = a.name + " (" + a.ICAO + ")"
+        result(x) = a.Name + " (" + a.ICAO + ")"
     Next
         
     AirportNames = result
@@ -292,7 +363,7 @@ Property Get AirlineNames() As Variant
     ReDim results(UBound(aLines))
     For x = 0 To UBound(aLines)
         Set a = aLines(x)
-        results(x) = a.name
+        results(x) = a.Name
     Next
     
     AirlineNames = results
@@ -312,7 +383,7 @@ Public Sub AddAirline(ByVal aCode As String, ByVal aName As String)
     'Create the airline
     Set a = New Airline
     a.code = aCode
-    a.name = aName
+    a.Name = aName
     ReDim Preserve aLines(UBound(aLines) + 1)
     Set aLines(UBound(aLines)) = a
 End Sub
@@ -475,14 +546,14 @@ Public Sub SaveAirports()
         Set a = airportInfo(x)
         lat = Replace(Format(a.Latitude, "##0.00000"), DecimalSeparator, ".")
         lng = Replace(Format(a.Longitude, "##0.00000"), DecimalSeparator, ".")
-        Print #fNum, a.name + "," + a.IATA + "," + a.ICAO + "," + lat + "," + lng
+        Print #fNum, a.Name + "," + a.IATA + "," + a.ICAO + "," + lat + "," + lng
     Next
     
     Close #fNum
     
     'Clear the force update flag if present
     ForceCfgUpdate = False
-    RegDelValue HKEY_CURRENT_USER, REG_SETTINGS_KEY, "UpdateConfig"
+    RegDelValue HKEY_LOCAL_MACHINE, REG_SETTINGS_KEY, "UpdateConfig"
     
 ExitSub:
     Exit Sub
@@ -512,7 +583,7 @@ Public Sub LoadAirlines()
         If (UBound(alData) > 0) Then
             Set a = New Airline
             a.code = alData(0)
-            a.name = Trim(alData(1))
+            a.Name = Trim(alData(1))
             
             'Add the airline
             ReDim Preserve aLines(UBound(aLines) + 1)
@@ -545,14 +616,14 @@ Public Sub SaveAirlines()
     Open App.path + "\" + AIRLINE_DATA For Output As #fNum
     For x = 0 To UBound(aLines)
         Set a = aLines(x)
-        Print #fNum, a.code + "," + a.name
+        Print #fNum, a.code + "," + a.Name
     Next
 
     Close #fNum
     
     'Clear the force update flag if present
     ForceCfgUpdate = False
-    RegDelValue HKEY_CURRENT_USER, REG_SETTINGS_KEY, "UpdateConfig"
+    RegDelValue HKEY_LOCAL_MACHINE, REG_SETTINGS_KEY, "UpdateConfig"
     
 ExitSub:
     Exit Sub
@@ -581,7 +652,7 @@ Public Sub LoadAirports()
         apData = Split(rawAirport, ",")
         If (UBound(apData) > 0) Then
             Set a = New Airport
-            a.name = apData(0)
+            a.Name = apData(0)
             a.IATA = apData(1)
             If (UBound(apData) > 1) Then
                 a.ICAO = apData(2)
@@ -645,27 +716,27 @@ End Function
 
 Public Sub SaveFlightCode(flightCode As String)
     If IsFS9 And (flightCode <> "") Then
-        RegWriteString HKEY_CURRENT_USER, REG_SETTINGS_KEY, "FlightID", flightCode
+        RegWriteString HKCU, REG_SETTINGS_KEY, "FlightID", flightCode
     Else
-        RegDelValue HKEY_CURRENT_USER, REG_SETTINGS_KEY, "FlightID"
+        RegDelValue HKCU, REG_SETTINGS_KEY, "FlightID"
     End If
 End Sub
 
 Public Function OldFlightID() As String
-    OldFlightID = RegReadString(HKEY_CURRENT_USER, REG_SETTINGS_KEY, "FlightID", "")
+    OldFlightID = RegReadString(HKCU, REG_SETTINGS_KEY, "FlightID", "")
 End Function
 
 Public Function GetClosestAirport(ByVal lat As Double, ByVal lng As Double) As Airport
     Dim result As Airport, a As Airport
-    Dim distance As Integer
+    Dim Distance As Integer
     Dim x As Integer
 
-    distance = 15000
+    Distance = 15000
     For x = 0 To UBound(airportInfo)
         Set a = airportInfo(x)
-        If (a.DistanceTo(lat, lng) < distance) Then
+        If (a.DistanceTo(lat, lng) < Distance) Then
             Set result = a
-            distance = a.DistanceTo(lat, lng)
+            Distance = a.DistanceTo(lat, lng)
         End If
     Next
     

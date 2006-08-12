@@ -22,13 +22,30 @@ Begin VB.Form frmMain
    EndProperty
    Icon            =   "frmMain.frx":0000
    LinkTopic       =   "Form1"
-   LockControls    =   -1  'True
    MaxButton       =   0   'False
    ScaleHeight     =   9030
    ScaleWidth      =   9420
    StartUpPosition =   3  'Windows Default
    Visible         =   0   'False
    WhatsThisHelp   =   -1  'True
+   Begin VB.Timer tmrFilePIREP 
+      Enabled         =   0   'False
+      Interval        =   500
+      Left            =   8160
+      Top             =   2280
+   End
+   Begin VB.Timer tmrFailures 
+      Enabled         =   0   'False
+      Interval        =   60000
+      Left            =   8640
+      Top             =   2760
+   End
+   Begin VB.Timer tmrFSCheck 
+      Enabled         =   0   'False
+      Interval        =   1500
+      Left            =   8160
+      Top             =   2760
+   End
    Begin VB.Timer tmrStartCheck 
       Enabled         =   0   'False
       Interval        =   500
@@ -57,7 +74,7 @@ Begin VB.Form frmMain
    End
    Begin VB.Timer tmrPosUpdates 
       Enabled         =   0   'False
-      Interval        =   200
+      Interval        =   250
       Left            =   8160
       Top             =   3720
    End
@@ -81,7 +98,7 @@ Begin VB.Form frmMain
       EndProperty
       Height          =   345
       Left            =   8140
-      TabIndex        =   26
+      TabIndex        =   27
       TabStop         =   0   'False
       Top             =   170
       Width           =   1235
@@ -90,7 +107,7 @@ Begin VB.Form frmMain
       Align           =   2  'Align Bottom
       Height          =   300
       Left            =   0
-      TabIndex        =   29
+      TabIndex        =   30
       Top             =   8730
       Width           =   9420
       _ExtentX        =   16616
@@ -149,7 +166,7 @@ Begin VB.Form frmMain
       Enabled         =   0   'False
       Height          =   345
       Left            =   8140
-      TabIndex        =   28
+      TabIndex        =   29
       TabStop         =   0   'False
       Top             =   930
       Visible         =   0   'False
@@ -159,7 +176,7 @@ Begin VB.Form frmMain
       Caption         =   "Start Flight"
       Height          =   345
       Left            =   8140
-      TabIndex        =   27
+      TabIndex        =   28
       TabStop         =   0   'False
       Top             =   545
       Width           =   1235
@@ -168,7 +185,7 @@ Begin VB.Form frmMain
       CausesValidation=   0   'False
       Height          =   3720
       Left            =   120
-      TabIndex        =   30
+      TabIndex        =   31
       Top             =   4970
       Width           =   9195
       _ExtentX        =   16219
@@ -193,11 +210,11 @@ Begin VB.Form frmMain
       TabPicture(1)   =   "frmMain.frx":0028
       Tab(1).ControlEnabled=   0   'False
       Tab(1).Control(0)=   "lstPilots"
-      Tab(1).Control(1)=   "infoFrame"
+      Tab(1).Control(1)=   "cmdBusy"
+      Tab(1).Control(1).Enabled=   0   'False
       Tab(1).Control(2)=   "cmdUpdatePilotList"
       Tab(1).Control(2).Enabled=   0   'False
-      Tab(1).Control(3)=   "cmdBusy"
-      Tab(1).Control(3).Enabled=   0   'False
+      Tab(1).Control(3)=   "infoFrame"
       Tab(1).ControlCount=   4
       TabCaption(2)   =   "Air Traffic Control"
       TabPicture(2)   =   "frmMain.frx":0044
@@ -211,6 +228,14 @@ Begin VB.Form frmMain
       Tab(3).ControlEnabled=   0   'False
       Tab(3).Control(0)=   "rtfDebug"
       Tab(3).ControlCount=   1
+      Begin VB.ListBox lstPilots 
+         ForeColor       =   &H00800000&
+         Height          =   2985
+         Left            =   -74880
+         TabIndex        =   95
+         Top             =   120
+         Width           =   3855
+      End
       Begin VB.CommandButton cmdBusy 
          Caption         =   "I'm Busy"
          Height          =   255
@@ -231,7 +256,6 @@ Begin VB.Form frmMain
          _ExtentY        =   5530
          _Version        =   393217
          BorderStyle     =   0
-         Enabled         =   -1  'True
          ReadOnly        =   -1  'True
          ScrollBars      =   2
          TextRTF         =   $"frmMain.frx":007C
@@ -549,6 +573,25 @@ Begin VB.Form frmMain
             Visible         =   0   'False
             Width           =   1695
          End
+         Begin VB.Label lblHidden 
+            Caption         =   "HIDDEN"
+            BeginProperty Font 
+               Name            =   "Tahoma"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   700
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
+            EndProperty
+            ForeColor       =   &H00C00000&
+            Height          =   255
+            Left            =   4140
+            TabIndex        =   94
+            Top             =   270
+            Visible         =   0   'False
+            Width           =   660
+         End
          Begin VB.Label pilotInfoRoute 
             BackStyle       =   0  'Transparent
             Caption         =   "Airport (XXXX) - Airport (XXXX)"
@@ -599,11 +642,11 @@ Begin VB.Form frmMain
             EndProperty
             ForeColor       =   &H000000FF&
             Height          =   255
-            Left            =   3720
+            Left            =   3600
             TabIndex        =   87
             Top             =   270
             Visible         =   0   'False
-            Width           =   615
+            Width           =   495
          End
          Begin VB.Label pilotInfoConnectionInfo 
             Appearance      =   0  'Flat
@@ -731,19 +774,10 @@ Begin VB.Form frmMain
             Width           =   855
          End
       End
-      Begin VB.ListBox lstPilots 
-         ForeColor       =   &H00800000&
-         Height          =   3180
-         Left            =   -74880
-         Sorted          =   -1  'True
-         TabIndex        =   31
-         Top             =   120
-         Width           =   3855
-      End
       Begin VB.TextBox txtCmd 
          Height          =   285
          Left            =   120
-         TabIndex        =   19
+         TabIndex        =   20
          Top             =   3000
          Width           =   7965
       End
@@ -751,7 +785,7 @@ Begin VB.Form frmMain
          Caption         =   "SEND"
          Height          =   285
          Left            =   8160
-         TabIndex        =   21
+         TabIndex        =   22
          Top             =   3000
          Width           =   930
       End
@@ -759,7 +793,7 @@ Begin VB.Form frmMain
          CausesValidation=   0   'False
          Height          =   2800
          Left            =   120
-         TabIndex        =   18
+         TabIndex        =   19
          TabStop         =   0   'False
          Top             =   120
          Width           =   8955
@@ -767,7 +801,6 @@ Begin VB.Form frmMain
          _ExtentY        =   4948
          _Version        =   393217
          BorderStyle     =   0
-         Enabled         =   -1  'True
          ReadOnly        =   -1  'True
          ScrollBars      =   2
          OLEDragMode     =   0
@@ -779,19 +812,30 @@ Begin VB.Form frmMain
       Caption         =   "Pilot Authentication"
       Height          =   720
       Left            =   120
-      TabIndex        =   25
+      TabIndex        =   26
       Top             =   80
       Width           =   7935
+      Begin VB.CheckBox chkStealth 
+         Caption         =   "Hidden"
+         Enabled         =   0   'False
+         Height          =   375
+         Left            =   7020
+         TabIndex        =   3
+         Top             =   240
+         Visible         =   0   'False
+         Width           =   795
+      End
       Begin VB.TextBox txtPilotName 
          BackColor       =   &H8000000F&
          CausesValidation=   0   'False
          Enabled         =   0   'False
          ForeColor       =   &H00C00000&
          Height          =   285
-         Left            =   1200
+         Left            =   1080
          TabIndex        =   0
          TabStop         =   0   'False
          Top             =   265
+         Visible         =   0   'False
          Width           =   1575
       End
       Begin VB.TextBox txtPilotID 
@@ -805,7 +849,7 @@ Begin VB.Form frmMain
             Strikethrough   =   0   'False
          EndProperty
          Height          =   285
-         Left            =   3915
+         Left            =   3600
          TabIndex        =   1
          Top             =   265
          WhatsThisHelpID =   104
@@ -823,37 +867,38 @@ Begin VB.Form frmMain
          EndProperty
          Height          =   285
          IMEMode         =   3  'DISABLE
-         Left            =   6435
+         Left            =   5640
          PasswordChar    =   "*"
          TabIndex        =   2
          Top             =   265
          Width           =   1090
       End
-      Begin VB.Label Label1 
+      Begin VB.Label lblName 
          Alignment       =   1  'Right Justify
          Caption         =   "Pilot Name:"
          Height          =   255
-         Left            =   240
-         TabIndex        =   24
-         Top             =   295
+         Left            =   120
+         TabIndex        =   25
+         Top             =   300
+         Visible         =   0   'False
          Width           =   855
       End
       Begin VB.Label Label8 
          Alignment       =   1  'Right Justify
          Caption         =   "Pilot ID:"
          Height          =   255
-         Left            =   3195
-         TabIndex        =   23
-         Top             =   295
+         Left            =   2880
+         TabIndex        =   24
+         Top             =   300
          Width           =   615
       End
       Begin VB.Label Label11 
          Alignment       =   1  'Right Justify
          Caption         =   "Password:"
          Height          =   255
-         Left            =   5460
-         TabIndex        =   22
-         Top             =   295
+         Left            =   4680
+         TabIndex        =   23
+         Top             =   300
          Width           =   915
       End
    End
@@ -878,36 +923,36 @@ Begin VB.Form frmMain
          Left            =   1395
          List            =   "frmMain.frx":0179
          Style           =   2  'Dropdown List
-         TabIndex        =   3
+         TabIndex        =   4
          Top             =   240
          Width           =   2175
       End
       Begin VB.TextBox txtAirportL 
          Height          =   315
          Left            =   4800
-         TabIndex        =   14
+         TabIndex        =   15
          Top             =   1320
-         Width           =   530
+         Width           =   540
       End
       Begin VB.TextBox txtAirportA 
          Height          =   315
          Left            =   4800
-         TabIndex        =   10
+         TabIndex        =   11
          Top             =   960
-         Width           =   530
+         Width           =   540
       End
       Begin VB.TextBox txtAirportD 
          Height          =   315
          Left            =   4800
-         TabIndex        =   8
+         TabIndex        =   9
          Top             =   600
-         Width           =   530
+         Width           =   540
       End
       Begin VB.TextBox txtRoute 
          Height          =   675
          Left            =   1395
          MultiLine       =   -1  'True
-         TabIndex        =   16
+         TabIndex        =   17
          Top             =   1740
          Width           =   6345
       End
@@ -915,21 +960,21 @@ Begin VB.Form frmMain
          Height          =   615
          Left            =   1395
          MultiLine       =   -1  'True
-         TabIndex        =   17
+         TabIndex        =   18
          Top             =   2520
          Width           =   6345
       End
       Begin VB.TextBox txtFlightNumber 
          Height          =   300
          Left            =   4120
-         TabIndex        =   4
+         TabIndex        =   5
          Top             =   240
          Width           =   500
       End
       Begin VB.TextBox txtCruiseAlt 
          Height          =   300
          Left            =   6675
-         TabIndex        =   11
+         TabIndex        =   12
          Top             =   960
          Width           =   1080
       End
@@ -939,7 +984,7 @@ Begin VB.Form frmMain
          Left            =   6455
          List            =   "frmMain.frx":018B
          Style           =   2  'Dropdown List
-         TabIndex        =   6
+         TabIndex        =   7
          Top             =   240
          Width           =   1320
       End
@@ -949,7 +994,7 @@ Begin VB.Form frmMain
          ItemData        =   "frmMain.frx":018D
          Left            =   1395
          List            =   "frmMain.frx":0194
-         TabIndex        =   7
+         TabIndex        =   8
          Text            =   "cboAirportD"
          ToolTipText     =   "This is the Airport you are departing from."
          Top             =   600
@@ -960,7 +1005,7 @@ Begin VB.Form frmMain
          ItemData        =   "frmMain.frx":01A4
          Left            =   1395
          List            =   "frmMain.frx":01AB
-         TabIndex        =   9
+         TabIndex        =   10
          Text            =   "cboAirportA"
          ToolTipText     =   "This is the Airport you are arriving at."
          Top             =   960
@@ -972,7 +1017,7 @@ Begin VB.Form frmMain
          Left            =   6675
          List            =   "frmMain.frx":01CB
          Style           =   2  'Dropdown List
-         TabIndex        =   12
+         TabIndex        =   13
          Top             =   1320
          Width           =   1090
       End
@@ -981,7 +1026,7 @@ Begin VB.Form frmMain
          ItemData        =   "frmMain.frx":01EB
          Left            =   1395
          List            =   "frmMain.frx":01ED
-         TabIndex        =   13
+         TabIndex        =   14
          Text            =   "cboAirportL"
          Top             =   1320
          Width           =   3335
@@ -990,7 +1035,7 @@ Begin VB.Form frmMain
          Caption         =   "This is an Aircraft Check Ride"
          Height          =   255
          Left            =   1440
-         TabIndex        =   15
+         TabIndex        =   16
          TabStop         =   0   'False
          Top             =   3240
          Width           =   2400
@@ -998,7 +1043,7 @@ Begin VB.Form frmMain
       Begin VB.TextBox txtLeg 
          Height          =   300
          Left            =   5040
-         TabIndex        =   5
+         TabIndex        =   6
          Text            =   "1"
          Top             =   240
          Width           =   280
@@ -1111,7 +1156,7 @@ Begin VB.Form frmMain
          Caption         =   "Leg"
          Height          =   255
          Left            =   4640
-         TabIndex        =   20
+         TabIndex        =   21
          Top             =   285
          Width           =   345
       End
@@ -1142,6 +1187,9 @@ Begin VB.Form frmMain
       End
       Begin VB.Menu mnuFlightSep1 
          Caption         =   "-"
+      End
+      Begin VB.Menu mnuFlightFuelLoad 
+         Caption         =   "&Load Fuel Tanks"
       End
       Begin VB.Menu mnuClearChatText 
          Caption         =   "Clear Chat Text"
@@ -1182,6 +1230,9 @@ Begin VB.Form frmMain
       Begin VB.Menu mnuOptionsShowPilotNames 
          Caption         =   "Show Pilot &Names"
       End
+      Begin VB.Menu mnuOptionsColdDark 
+         Caption         =   "&Cold and Dark Cockpit"
+      End
       Begin VB.Menu mnuOptionsHide 
          Caption         =   "&Hide when Minimized"
       End
@@ -1200,16 +1251,25 @@ Begin VB.Form frmMain
       Begin VB.Menu mnuOptionsSB3Support 
          Caption         =   "&SquawkBox 3 Integration"
       End
-      Begin VB.Menu mnuOptionsTS2Support 
-         Caption         =   "&TeamSpeak 2 Integration"
-      End
       Begin VB.Menu mnuOptionsGaugeIntegration 
          Caption         =   "&Gauge Integration"
-         Enabled         =   0   'False
+      End
+   End
+   Begin VB.Menu mnuFailures 
+      Caption         =   "Failures"
+      Enabled         =   0   'False
+      Begin VB.Menu mnuFailuresEnabled 
+         Caption         =   "&Enable Simulated Failures"
+      End
+      Begin VB.Menu mnuFailuresSilent 
+         Caption         =   "Silent Failures"
+      End
+      Begin VB.Menu mnuFailuresConfig 
+         Caption         =   "Failure &Configuration"
       End
    End
    Begin VB.Menu mnuHelp 
-      Caption         =   "Help"
+      Caption         =   "&Help"
       Begin VB.Menu mnuHelpAbout 
          Caption         =   "&About ACARS"
       End
@@ -1234,6 +1294,8 @@ Dim intCmdHistIndex As Integer
 Dim blnFirstCmd As Boolean
 Dim strCmdBuffer As String
 Dim intCmdBufferSel As Integer
+
+Private TotalBytes As Long
 
 'Left-click constants.
 Private Const WM_LBUTTONDBLCLK = &H203   'Double-click
@@ -1274,16 +1336,18 @@ End Sub
 
 Private Sub chkCheckRide_Click()
     info.CheckRide = Not (chkCheckRide.value = 0)
-    chkTrainFlight.enabled = Not info.CheckRide
+    chkTrainFlight.Enabled = Not info.CheckRide
     If info.CheckRide And info.TestFlight Then
         chkTrainFlight.value = 0
         info.TestFlight = False
+        mnuFailures.Enabled = False
     End If
 End Sub
 
 Private Sub chkTrainFlight_Click()
     info.TestFlight = Not (chkTrainFlight.value = 0)
-    chkCheckRide.enabled = Not info.TestFlight
+    chkCheckRide.Enabled = Not info.TestFlight
+    mnuFailures.Enabled = info.TestFlight
     If info.TestFlight And info.CheckRide Then
         chkCheckRide.value = 0
         info.CheckRide = False
@@ -1346,6 +1410,7 @@ Private Sub cmdPIREP_Click()
     Dim fRoot As String
 
     'Just file the PIREP if not a training flight
+    tmrFilePIREP.Enabled = False
     If Not info.TestFlight Then
         FilePIREP
         Exit Sub
@@ -1401,7 +1466,7 @@ Private Sub FilePIREP()
     If info.PIREPFiled Then Exit Sub
     
     'Disable the option
-    frmMain.cmdPIREP.enabled = False
+    frmMain.cmdPIREP.Enabled = False
     
     'If we don't have a flight ID, then file the flight info
     If (info.FlightID = 0) Then
@@ -1410,9 +1475,9 @@ Private Sub FilePIREP()
         ShowMessage "Sending Offline Flight Information", ACARSTEXTCOLOR
     
         'If we time out, raise an error
-        If Not WaitForACK(msgID, 7500) Then
+        If Not WaitForACK(msgID, 8500) Then
             MsgBox "ACARS Server timed out returning Flight ID!", vbCritical + vbOKOnly
-            frmMain.cmdPIREP.enabled = True
+            frmMain.cmdPIREP.Enabled = True
             Exit Sub
         End If
     End If
@@ -1432,7 +1497,7 @@ Private Sub FilePIREP()
         'File the Flight Positions
         ShowMessage "Sending " + CStr(UBound(Queue) + 1) + " Position Records", ACARSTEXTCOLOR
         For x = 0 To UBound(Queue)
-            msgID = SendPosition(Queue(x), True)
+            msgID = SendPosition(Queue(x), True, True)
             frmMain.PositionProgress.value = x
             If ((x Mod 4) = 0) Then
                 ReqStack.Send
@@ -1448,27 +1513,27 @@ Private Sub FilePIREP()
     'End the flight (the ACARS server will discard multiple messages)
     msgID = SendEndFlight
     ReqStack.Send
-    If Not WaitForACK(msgID, 3500) Then ShowMessage "No server response on EndFlight", ACARSERRORCOLOR
+    WaitForACK msgID, 6500
 
     'Send the PIREP
     msgID = SendPIREP(info)
     frmMain.PositionProgress.value = frmMain.PositionProgress.Max
     ShowMessage "Sending Flight Report " + Hex(msgID), ACARSTEXTCOLOR
     ReqStack.Send
-    DoEvents
     
     'Wait for the ACK
-    If Not WaitForACK(msgID, 16000) Then
+    If Not WaitForACK(msgID, 17500) Then
         MsgBox "ACARS Server timed out sending Flight Report!" & vbCrLf & vbCrLf & _
-            "You may want to disconnect, reconnect and try again.", vbCritical + _
-            vbOKOnly, "Flight Report Time Out"
-        cmdPIREP.enabled = True
+            "You may want to disconnect, reconnect and try again. (You may also want to" & vbCrLf & _
+            "check your Log Book - the flight may be logged.)", vbCritical Or vbOKOnly, "Flight Report Timed Out"
+        cmdPIREP.Enabled = True
         progressLabel.visible = False
         Exit Sub
     End If
     
     'Reset the flight data
     ResetFlightInfo
+    GAUGE_SetPhase UNKNOWN, config.ACARSConnected
     
     'Show status messages
     ShowFSMessage "Flight Report Successfully filed", True, 15
@@ -1545,7 +1610,7 @@ Private Sub cmdUpdatePilotList_Click()
 End Sub
 
 Private Sub Form_GotFocus()
-    If config.MsgReceived And config.FSUIPCConnected Then GAUGE_ClearChat
+    If config.MsgReceived Then GAUGE_ClearChat
 End Sub
 
 Private Sub Form_Load()
@@ -1553,9 +1618,10 @@ Private Sub Form_Load()
     blnFirstCmd = True
     
     'Ensure timers are enabled
-    tmrPing.enabled = False
-    tmrPosUpdates.enabled = False
-    tmrFlightTime.enabled = False
+    tmrPing.Enabled = False
+    tmrPosUpdates.Enabled = False
+    tmrFlightTime.Enabled = False
+    tmrFailures.Enabled = False
 End Sub
 
 Private Sub Form_MouseMove(Button As Integer, Shift As Integer, x As Single, y As Single)
@@ -1592,7 +1658,6 @@ Private Sub Form_Unload(Cancel As Integer)
 
     'Close FSUIPC connection
     FSUIPC_Close
-    config.FSUIPCConnected = False
     
     'Save settings
     config.Save
@@ -1617,7 +1682,7 @@ Private Sub lstATC_Click()
     
     'Update the controller info
     users.SelectedATC = ctr.ID
-    atcInfoName.Caption = ctr.name
+    atcInfoName.Caption = ctr.Name
     atcInfoFacility.Caption = ctr.FacilityInfo
     atcInfoRating.Caption = ctr.Rating
     atcInfoFreq.Caption = ctr.Frequency
@@ -1638,7 +1703,7 @@ Private Sub lstPilots_Click()
     
     'Update the pilot info
     users.SelectedPilot = p.ID
-    pilotInfoName.Caption = p.name
+    pilotInfoName.Caption = p.Name
     pilotInfoRank.Caption = p.Rank + ", " + p.EquipmentType
     pilotInfoFlightData.Caption = p.FlightTotals
     
@@ -1652,8 +1717,8 @@ Private Sub lstPilots_Click()
         If Not ((p.AirportA Is Nothing) Or (p.airportD Is Nothing)) Then
             Label22.visible = True
             pilotInfoRoute.visible = True
-            pilotInfoRoute.Caption = p.airportD.name + " (" + p.airportD.ICAO + ") - " + _
-                p.AirportA.name + " (" + p.AirportA.ICAO + ")"
+            pilotInfoRoute.Caption = p.airportD.Name + " (" + p.airportD.ICAO + ") - " + _
+                p.AirportA.Name + " (" + p.AirportA.ICAO + ")"
         Else
             Label22.visible = False
             pilotInfoRoute.visible = False
@@ -1667,6 +1732,7 @@ Private Sub lstPilots_Click()
     End If
     
     lblBusy.visible = p.IsBusy
+    lblHidden.visible = p.IsHidden
     infoFrame.visible = True
     If config.HasRole("HR") Then
         pilotInfoConnectionInfo.Caption = "Build " + CStr(p.ClientBuild) + " from " + p.RemoteAddress
@@ -1695,7 +1761,7 @@ Private Sub mnuConnect_Click()
     ToggleACARSConnection
 End Sub
 
-Public Sub UpdateTuneButtons(visible As Boolean, enabled As Boolean, Optional btnCaption As String = "")
+Public Sub UpdateTuneButtons(visible As Boolean, Enabled As Boolean, Optional btnCaption As String = "")
     Dim TuneButtons As Variant
     Dim btn As Variant
     
@@ -1703,12 +1769,47 @@ Public Sub UpdateTuneButtons(visible As Boolean, enabled As Boolean, Optional bt
     For Each btn In TuneButtons
         btn.Caption = btnCaption
         btn.visible = visible
-        btn.enabled = enabled
+        btn.Enabled = Enabled
     Next
+End Sub
+
+Private Sub mnuFailuresConfig_Click()
+    Load frmFailure
+    frmFailure.Show
+End Sub
+
+Private Sub mnuFailuresEnabled_Click()
+    config.FailuresEnabled = Not config.FailuresEnabled
+    config.UpdateSettingsMenu
+End Sub
+
+Private Sub mnuFailuresSilent_Click()
+    config.FailuresSilent = Not config.FailuresSilent
+    config.UpdateSettingsMenu
 End Sub
 
 Private Sub mnuFlightExit_Click()
     Unload frmMain
+End Sub
+
+Private Sub mnuFlightFuelLoad_Click()
+
+    'Ensure FS is running
+    If Not IsFSReady Then
+        MsgBox "Microsoft Flight Simulator must be ready before you can load Fuel.", _
+            vbExclamation, "Flight Simulator Not Ready"
+        Exit Sub
+    End If
+    
+    'Make sure we have two airports loaded
+    If (info.airportD Is Nothing) Or (info.AirportA Is Nothing) Then
+        MsgBox "You must have a Departure and Destination Airport set before you can load Fuel.", _
+            vbExclamation, "Airports not Set"
+        Exit Sub
+    End If
+    
+    Load frmFuel
+    frmFuel.Show
 End Sub
 
 Private Sub mnuHelpAbout_Click()
@@ -1718,6 +1819,11 @@ End Sub
 Private Sub mnuOpenFlightPlan_Click()
     FPlan_Open
     config.UpdateFlightInfo
+End Sub
+
+Private Sub mnuOptionsColdDark_Click()
+    config.ColdDark = Not config.ColdDark
+    config.UpdateSettingsMenu
 End Sub
 
 Private Sub mnuOptionsDisableAutoSave_Click()
@@ -1752,11 +1858,6 @@ End Sub
 
 Private Sub mnuCOMSterileCockpit_Click()
     config.SterileCockpit = Not config.SterileCockpit
-    config.UpdateSettingsMenu
-End Sub
-
-Private Sub mnuOptionsTS2Support_Click()
-    config.TS2Support = Not config.TS2Support
     config.UpdateSettingsMenu
 End Sub
 
@@ -1819,12 +1920,14 @@ Public Function StopFlight(Optional isError As Boolean = False) As Boolean
 
     'Stop tracking/timing flight.
     StopFlight = True
-    tmrPosUpdates.enabled = False
-    tmrFlightTime.enabled = False
+    tmrPosUpdates.Enabled = False
+    tmrFlightTime.Enabled = False
+    tmrFailures.Enabled = False
+    If info.TestFlight Then mnuFailures.Enabled = True
 
     'Set some flags and control states.
     If info.FlightData Then
-        Dim distance As Integer, distanceD As Integer
+        Dim Distance As Integer, distanceD As Integer
         Dim AirportA As Airport
         
         info.FlightPhase = COMPLETE
@@ -1833,11 +1936,11 @@ Public Function StopFlight(Optional isError As Boolean = False) As Boolean
         distanceD = info.AirportA.DistanceTo(pos.Latitude, pos.Longitude)
         If (distanceD > 10) Then
             Set AirportA = config.GetClosestAirport(pos.Latitude, pos.Longitude)
-            distance = AirportA.DistanceTo(pos.Latitude, pos.Longitude)
+            Distance = AirportA.DistanceTo(pos.Latitude, pos.Longitude)
             
             If (MsgBox("You are " & CStr(distanceD) & " miles away from your Destination." & _
-                vbCrLf & "The closest airport (" & CStr(distance) & " miles away) is " & _
-                AirportA.name & "." & vbCrLf & vbCrLf & "Update your destination?", _
+                vbCrLf & "The closest airport (" & CStr(Distance) & " miles away) is " & _
+                AirportA.Name & "." & vbCrLf & vbCrLf & "Update your destination?", _
                 vbYesNo Or vbExclamation, "Update Destination") = vbYes) Then
                 Set info.AirportA = AirportA
                 config.UpdateFlightInfo
@@ -1845,10 +1948,16 @@ Public Function StopFlight(Optional isError As Boolean = False) As Boolean
         End If
         
         'Save arrival data if we don't have it yet
-        If (Year(info.GateTime) < Year(info.StartTime)) Then
+        If (Year(info.GateTime.LocalTime) < Year(info.StartTime.LocalTime)) Then
             info.GateTime.LocalTime = Now
-            info.GateFuel = pos.fuel
+            info.GateFuel = pos.Fuel
             info.GateWeight = pos.weight
+        End If
+        
+        'If we have the gauge enabled, start the timer
+        If Not tmrFilePIREP.Enabled And config.GaugeSupport And config.FSUIPCConnected Then
+            tmrFilePIREP.Enabled = True
+            ShowMessage "Starting PIREP filing timer", DEBUGTEXTCOLOR
         End If
     Else
         LockFlightInfo True
@@ -1889,21 +1998,24 @@ Public Function StopFlight(Optional isError As Boolean = False) As Boolean
     'Disable online ATC Tab
     SSTab1.TabEnabled(2) = False
     SSTab1.TabVisible(2) = False
-
+    
     'Close FSUIPC link.
-    FSUIPC_Close
-    config.FSUIPCConnected = False
+    If isError Then
+        FSUIPC_Close False
+    Else
+        GAUGE_SetPhase info.FlightPhase, config.ACARSConnected
+    End If
 
     'Show flight info window if the flight was completed.
     SetButtonMenuStates
     If (info.FlightPhase = COMPLETE) Then
         cmdPIREP.visible = True
-        cmdStartStopFlight.enabled = False
+        cmdStartStopFlight.Enabled = False
         If info.TestFlight Then
-            cmdPIREP.enabled = True
+            cmdPIREP.Enabled = True
             cmdPIREP.Caption = "Export Data"
         Else
-            cmdPIREP.enabled = config.ACARSConnected
+            cmdPIREP.Enabled = config.ACARSConnected
             cmdPIREP.Caption = "File PIREP"
         End If
             
@@ -1995,85 +2107,125 @@ Sub RestoreFlight()
     LockFlightInfo False
     cmdStartStopFlight.Caption = "Stop Flight"
     cmdPIREP.visible = True
-    cmdPIREP.enabled = False
-    tmrPosUpdates.enabled = True
-    tmrFlightTime.enabled = True
+    cmdPIREP.Enabled = False
+    tmrPosUpdates.Enabled = True
+    tmrFlightTime.Enabled = True
 End Sub
 
-Sub StartFlight()
+Private Function ValidateFlightInfo(ByRef ErrMsg As String, Optional ShowDialog As Boolean = True) As Boolean
+
+    'Check if we're already flying
+    If info.InFlight Then
+        ErrMsg = "You already have a flight in progress!"
+        Exit Function
+    End If
+    
+    'Make sure we're not starting a flight without having PIREPped a previous flight.
+    If info.FlightData And Not info.PIREPFiled Then
+        ErrMsg = "You have not submitted a PIREP for your previous flight."
+        If Not ShowDialog Then Exit Function
+        If (MsgBox(ErrMsg & " If you start a new flight now, the previous flight data will be discarded. Are you sure?", _
+            vbYesNo Or vbQuestion, "Error") = vbNo) Then Exit Function
+    End If
+
+    'Make sure all required flight data has been entered.
+    If txtPilotID.Text = "" Then
+        ErrMsg = "Please enter your pilot ID."
+        txtPilotID.SetFocus
+        Exit Function
+    ElseIf (info.FlightNumber = 0) Then
+        ErrMsg = "Please enter the Flight Number."
+        txtFlightNumber.SetFocus
+        Exit Function
+    ElseIf (info.FlightLeg <= 0) Or (info.FlightLeg > 5) Then
+        ErrMsg = "Please enter the Flight Leg."
+        txtLeg.SetFocus
+        Exit Function
+    ElseIf (Len(info.EquipmentType) < 3) Then
+        ErrMsg = "Please select your Aircraft type."
+        cboEquipment.SetFocus
+        Exit Function
+    ElseIf info.CruiseAltitude = "" Then
+        ErrMsg = "Please select your cruise altitude."
+        txtCruiseAlt.SetFocus
+        Exit Function
+    ElseIf (info.airportD Is Nothing) Then
+        ErrMsg = "Please select your Departure airport."
+        cboAirportD.SetFocus
+        Exit Function
+    ElseIf (info.AirportA Is Nothing) Then
+        ErrMsg = "Please enter your Destination airport."
+        cboAirportA.SetFocus
+        Exit Function
+    ElseIf ((info.airportD.ICAO = info.AirportA.ICAO) And Not info.TestFlight) Then
+        ErrMsg = "Your Departure (" & info.airportD.ICAO & ") and Destination (" & info.AirportA.ICAO & _
+            ") airports cannot be the same."
+        cboAirportD.SetFocus
+        Exit Function
+    ElseIf info.Route = "" Then
+        ErrMsg = "Please enter your route of flight."
+        txtRoute.SetFocus
+        Exit Function
+    End If
+    
+    ValidateFlightInfo = True
+End Function
+
+Sub StartFlight(Optional ShowDialogs As Boolean = True)
+    Dim ErrorMsg As String
     Dim dwResult As Long
-    Dim distance As Integer
+    Dim Distance As Integer
     
     'Kill the autostart timer
-    tmrStartCheck.enabled = False
+    tmrStartCheck.Enabled = False
     If info.InFlight Then
-        MsgBox "You already have a flight in progress!", vbOKOnly Or vbExclamation, "Error"
+        If ShowDialogs Then
+            MsgBox "You already have a flight in progress!", vbOKOnly Or vbExclamation, "Error"
+        Else
+            ShowMessage "Cannot Start Flight - Flight in Progress", ACARSERRORCOLOR
+        End If
+            
         Exit Sub
     End If
     
-    'Populate the flight information
-    info.CruiseAltitude = frmMain.txtCruiseAlt.Text
-    On Error Resume Next
-    info.FlightNumber = CInt(frmMain.txtFlightNumber.Text)
-    info.FlightLeg = CInt(frmMain.txtLeg.Text)
-    On Error GoTo 0
-
     'Make sure we're not starting a flight without having PIREPped a previous flight.
     If info.FlightData And Not info.PIREPFiled Then
-        If MsgBox("You have not submitted a PIREP for your previous flight. If you start a new flight now, the previous flight data will be discarded. Are you sure?", vbYesNo Or vbQuestion, "Error") _
-            = vbNo Then Exit Sub
+        If ShowDialogs Then
+            If (MsgBox("You have not submitted a PIREP for your previous flight. If you start a new flight now, the previous flight data will be discarded. Are you sure?", _
+                vbYesNo Or vbQuestion, "Error") = vbNo) Then Exit Sub
+        Else
+            ShowMessage "Cannot Start Flight - Unfiled Flight Report", ACARSERRORCOLOR
+            Exit Sub
+        End If
     End If
     
     'Prompt in case we're doing a test flight
-    If info.TestFlight Then
-        If MsgBox("You are starting a Training Flight. These Flights are used to record data for" & _
+    If info.TestFlight And ShowDialogs Then
+        If (MsgBox("You are starting a Training Flight. These Flights are used to record data for" & _
             vbCrLf & "training purposes, and NO DATA will be sent to the Server. NO FLIGHT REPORT" & _
             vbCrLf & "CAN BE FILED FROM A TRAINING FLIGHT." & vbCrLf & vbCrLf & "Are you sure you want to continue?", _
-            vbYesNo + vbExclamation + vbDefaultButton2, "Training Flight") = vbNo Then Exit Sub
+            vbYesNo Or vbExclamation Or vbDefaultButton2, "Training Flight") = vbNo) Then Exit Sub
     End If
     
-    'Make sure all required flight data has been entered.
-    If txtPilotID.Text = "" Then
-        MsgBox "Please enter your pilot ID.", vbOKOnly Or vbExclamation, "Cannot Start Flight"
-        txtPilotID.SetFocus
-        Exit Sub
-    ElseIf (info.FlightNumber = 0) Then
-        MsgBox "Please enter the Flight number.", vbOKOnly Or vbExclamation, "Cannot Start Flight"
-        txtFlightNumber.SetFocus
-        Exit Sub
-    ElseIf (info.FlightLeg <= 0) Or (info.FlightLeg > 5) Then
-        MsgBox "Please enter the Leg number.", vbOKOnly Or vbExclamation, "Cannot Start Flight"
-        txtLeg.SetFocus
-        Exit Sub
-    ElseIf (Len(info.EquipmentType) < 3) Then
-        MsgBox "Please select your aircraft type.", vbOKOnly Or vbExclamation, "Cannot Start Flight"
-        cboEquipment.SetFocus
-        Exit Sub
-    ElseIf info.CruiseAltitude = "" Then
-        MsgBox "Please enter your cruise altitude.", vbOKOnly Or vbExclamation, "Cannot Start Flight"
-        txtCruiseAlt.SetFocus
-        Exit Sub
-    ElseIf (info.airportD Is Nothing) Then
-        MsgBox "Please enter your departure airport.", vbOKOnly Or vbExclamation, "Cannot Start Flight"
-        cboAirportD.SetFocus
-        Exit Sub
-    ElseIf (info.AirportA Is Nothing) Then
-        MsgBox "Please enter your destination airport.", vbOKOnly Or vbExclamation, "Cannot Start Flight"
-        cboAirportA.SetFocus
-        Exit Sub
-    ElseIf (info.airportD.ICAO = info.AirportA.ICAO) Then
-        MsgBox "Your departure (" & info.airportD.ICAO & ") and destination (" & _
-            info.AirportA.ICAO & ") airports cannot be the same.", vbOKOnly Or vbExclamation, "Cannot Start Flight"
-        cboAirportD.SetFocus
-        Exit Sub
-    ElseIf info.Route = "" Then
-        MsgBox "Please enter your route of flight.", vbOKOnly Or vbExclamation, "Cannot Start Flight"
-        txtRoute.SetFocus
+    'Prompt to load fuel
+    If Not info.FuelLoaded And ShowDialogs Then
+        If (MsgBox("You have not yet calculated the fuel required for this Flight." & vbCrLf & _
+            vbCrLf & "Do you wish to perform fuel calculations and load fuel?", _
+            vbQuestion Or vbYesNo, "Fuel Not Calculated") = vbYes) Then
+            Load frmFuel
+            frmFuel.Show
+            Exit Sub
+        End If
+    End If
+    
+    'Make sure all required flight data has been entered
+    If Not ValidateFlightInfo(ErrorMsg, ShowDialogs) Then
+        MsgBox ErrorMsg, vbOKOnly Or vbCritical, "Cannot Start Flight"
         Exit Sub
     End If
     
     'Make sure we're rated for the aircraft
-    If config.ACARSConnected And Not info.CheckRide And Not config.HasRating(info.EquipmentType) Then
+    If config.ACARSConnected And ShowDialogs And Not info.CheckRide And Not config.HasRating(info.EquipmentType) Then
         If (MsgBox("You do not have a " & info.EquipmentType & " aircraft rating. This Flight Report" & _
             vbCrLf & "may not be approved! Do you wish to continue?", vbExclamation + vbYesNo + _
             vbDefaultButton2, "Not Rated in " & info.EquipmentType) = vbNo) Then Exit Sub
@@ -2082,19 +2234,18 @@ Sub StartFlight()
     'Attempt to connect to FSUIPC - Make sure the FSUIPC connection succeeded.
     If Not config.FSUIPCConnected Then
         FSUIPC_Connect
-        If Not config.FSUIPCConnected Then Exit Sub
+        If Not config.FSUIPCConnected Then
+            ShowMessage "Cannot establish FSUIPC connection", ACARSERRORCOLOR
+            Exit Sub
+        End If
     End If
     
     'Check for SB3
     If config.SB3Support Then
         config.SB3Connected = SB3Connected()
-        If (SB3Running() And Not config.SB3Connected) Then
+        If (ShowDialogs And SB3Running() And Not config.SB3Connected) Then
             If (MsgBox("Squawkbox 3 is running, but not connected to VATSIM. Do you want to connect?", _
-                vbExclamation + vbYesNo, "Squawkbox 3") = vbYes) Then
-                FSUIPC_Close
-                config.FSUIPCConnected = False
-                Exit Sub
-            End If
+                vbExclamation + vbYesNo, "Squawkbox 3") = vbYes) Then Exit Sub
         End If
         
         'If we're running, automatically set the network to VATSIM
@@ -2104,52 +2255,45 @@ Sub StartFlight()
         End If
     End If
     
-    'Get aircraft information
+    'Get aircraft information; do this anyways just in case it's changed
     Set acInfo = GetAircraftInfo()
     
     'Make sure the aircraft is parked and on the ground.
     Set pos = RecordFlightData(acInfo)
     If (pos Is Nothing) Then
         Exit Sub
-    ElseIf (info.FlightID = 0) And ((Not pos.Parked) Or (Not pos.onGround)) Then
-        MsgBox "You must be on the ground with the parking brake set in order to start a flight.", _
-            vbExclamation Or vbOKOnly, "Cannot Start Flight"
-        config.FSUIPCConnected = False
-        FSUIPC_Close
+    ElseIf ((info.FlightID = 0) And (Not pos.Parked)) Then
+        If ShowDialogs Then
+            MsgBox "You must be on the ground with the Parking Brake set in order to start a flight.", _
+                vbExclamation Or vbOKOnly, "Cannot Start Flight"
+        Else
+            PlaySoundFile "notify_error.wav"
+            ShowMessage "Cannot Start Flight - Must be on ground with Parking Brake set", ACARSERRORCOLOR
+        End If
+        
         Exit Sub
-    ElseIf ((pos.Latitude = 0) And (pos.Longitude = 0)) Then
-        MsgBox "FSUIPC does not appear to be working properly. Check your FSUIPC.LOG.", _
-            vbOKOnly Or vbCritical, "FSUIPC Position Error"
-        config.FSUIPCConnected = False
-        FSUIPC_Close
-        Exit Sub
-    End If
-    
-    'Adjust the AGL
-    If pos.onGround Then
-        acInfo.BaseAGL = pos.AltitudeAGL
-        If config.ShowDebug Then ShowMessage "AGL Altitude offset = " & CStr(pos.AltitudeAGL) & _
-            " feet", DEBUGTEXTCOLOR
     End If
     
     'Make sure we're close to the specified origin airport
-    distance = info.airportD.DistanceTo(pos.Latitude, pos.Longitude)
-    If (distance > 10) Then
-        ShowMessage "Lat=" + CStr(pos.Latitude) + ", Lon=" + CStr(pos.Longitude), _
-            ACARSERRORCOLOR
-        ShowMessage "APLat=" + CStr(info.airportD.Latitude) + ", APLon=" + _
-            CStr(info.airportD.Longitude), DEBUGTEXTCOLOR
-        MsgBox "You are " + CStr(distance) + " miles away from " + info.airportD.name + _
-            ". You must be within 10 miles to start a flight.", _
-            vbExclamation Or vbOKOnly, "Incorrect Departure Airport"
-        config.FSUIPCConnected = False
-        FSUIPC_Close
+    Distance = info.airportD.DistanceTo(pos.Latitude, pos.Longitude)
+    If (Distance > 10) Then
+        ShowMessage "MyLat=" + CStr(pos.Latitude) + ", MyLon=" + CStr(pos.Longitude), ACARSERRORCOLOR
+        ShowMessage "APLat=" + CStr(info.airportD.Latitude) + ", APLon=" + CStr(info.airportD.Longitude), ACARSERRORCOLOR
+        
+        'Display error message
+        ErrorMsg = "You are " + CStr(Distance) + " miles away from " + info.airportD.Name + ". You must be within 10 miles to start a flight."
+        If ShowDialogs Then
+            MsgBox ErrorMsg, vbExclamation Or vbOKOnly, "Incorrect Departure Airport"
+        Else
+            PlaySoundFile "notify_error.wav"
+            ShowFSMessage ErrorMsg, True, 10
+        End If
+        
         Exit Sub
     End If
     
     'Check if we're connected, but only if the "fly offline"
     'option is turned off. If not, then attempt to connect.
-    Dim result As VbMsgBoxResult
     If Not config.ACARSConnected And Not config.FlyOffline Then
         Dim totalTime As Integer
         ToggleACARSConnection
@@ -2162,24 +2306,23 @@ Sub StartFlight()
         Wend
 
         'If the connection failed, prompt to fly offline.
-        If Not config.ACARSConnected Then
-            result = MsgBox("The connection to the ACARS server failed. Do you wish to fly offline?", vbYesNo Or vbQuestion, "Connection Error")
-            If result = vbNo Then Exit Sub
+        If Not config.ACARSConnected And ShowDialogs Then
+            If (MsgBox("The connection to the ACARS server failed. Do you wish to fly offline?", _
+                vbYesNo Or vbQuestion, "Connection Error") = vbNo) Then Exit Sub
         End If
     End If
     
     'Start the flight
     info.StartFlight config.ACARSConnected
-    InitFuelCheck
 
     'If we're connected to the ACARS server, send a flight info message.
-    If config.ACARSConnected Then
+    If config.ACARSConnected And Not info.TestFlight Then
         info.InfoReqID = SendFlightInfo(info)
         ReqStack.Send
         
         'Wait for the ACK and the Flight ID
-        If Not WaitForACK(info.InfoReqID, 3500) Then
-            MsgBox "Time out waiting for Flight ID", vbOKOnly + vbCritical, "Time Out"
+        If Not WaitForACK(info.InfoReqID, 5000) Then
+            If ShowDialogs Then MsgBox "Time out waiting for Flight ID", vbOKOnly + vbCritical, "Time Out"
             Exit Sub
         End If
     End If
@@ -2189,8 +2332,13 @@ Sub StartFlight()
     GAUGE_SetInfo info, frmMain.txtPilotID.Text
 
     'Start timing/tracking flight
-    tmrFlightTime.enabled = True
-    tmrPosUpdates.enabled = True
+    tmrFlightTime.Enabled = True
+    tmrPosUpdates.Enabled = True
+    If info.TestFlight And config.FailuresEnabled Then
+        mnuFailures.Enabled = False
+        tmrFailures.Enabled = True
+        config.FailureConfig.EngineCount = pos.EngineCount
+    End If
     
     'Update status bar.
     sbMain.Panels(2).Text = "Flight Phase: " & info.PhaseName
@@ -2202,7 +2350,7 @@ Sub StartFlight()
     SetButtonMenuStates
     LockFlightInfo False
     cmdPIREP.visible = True
-    cmdPIREP.enabled = False
+    cmdPIREP.Enabled = False
     If info.TestFlight Then cmdPIREP.Caption = "Export Data"
 End Sub
 
@@ -2213,23 +2361,141 @@ Private Sub mnuSystrayRestore_Click()
     RemoveIcon
 End Sub
 
+Private Sub tmrFailures_Timer()
+    Dim failure As Integer
+    Dim FailureNames As Variant
+    Dim fType As Integer
+    
+    Static fCfg As Failures
+    Static FailureCount As Integer
+
+    If ((pos Is Nothing) Or pos.Paused Or pos.Slewing) Then Exit Sub
+    If (info.FlightPhase <> AIRBORNE) Then Exit Sub
+    
+    'If we have too many failures, then abort
+    If (fCfg Is Nothing) Then Set fCfg = config.FailureConfig
+    If (FailureCount = fCfg.MaxFailures) And Not config.FailureConfig.Force Then
+        tmrFailures.Enabled = False
+        Exit Sub
+    End If
+    
+    'Check if we have a failure
+    If config.FailureConfig.Force Then
+        fType = CInt(Rnd * 2)
+        If (fType = 0) Then
+            FailureNames = fCfg.EquipmentFailureNames
+        Else
+            FailureNames = fCfg.InstrumentFailureNames
+        End If
+    ElseIf fCfg.IsEquipmentFailure Then
+        FailureCount = FailureCount + 1
+        FailureNames = fCfg.EquipmentFailureNames
+    ElseIf fCfg.IsInstrumentFailure Then
+        FailureCount = FailureCount + 1
+        FailureNames = fCfg.InstrumentFailureNames
+    Else
+        Exit Sub
+    End If
+    
+    'Generate the failure
+    Randomize
+    failure = Rnd() * UBound(FailureNames)
+    If config.ShowDebug Then ShowMessage "Generating " & FailureNames(failure) & " Failure", DEBUGTEXTCOLOR
+    DoFailure FailureNames(failure)
+    config.FailureConfig.Force = False
+    
+    'Disable the failure in the future
+    fCfg.DisableFailure FailureNames(failure)
+End Sub
+
+Private Sub tmrFilePIREP_Timer()
+    Dim gaugePhase As Integer
+
+    'Get the gauge phase
+    gaugePhase = GAUGE_GetPhase()
+    If (gaugePhase <> PIREPFILE) Then Exit Sub
+    tmrFilePIREP.Enabled = False
+    tmrPosUpdates.Enabled = False
+    tmrFlightTime.Enabled = False
+    tmrFailures.Enabled = False
+    cmdStartStopFlight.Enabled = False
+    ShowMessage "Filing Flight Report from Gauge", DEBUGTEXTCOLOR
+    If info.TestFlight Then
+        mnuFailures.Enabled = True
+        Exit Sub
+    End If
+    
+    'Connect to ACARS if not connected
+    If Not config.ACARSConnected Then
+        Dim totalTime As Integer
+        ToggleACARSConnection
+        
+        'Wait for connection results
+        While (totalTime < 5000) And Not config.ACARSConnected
+            DoEvents
+            Sleep 250
+            totalTime = totalTime + 250
+        Wend
+        
+        If Not config.ACARSConnected Then Exit Sub
+    End If
+            
+    'File the PIREP
+    FilePIREP
+End Sub
+
 Private Sub tmrFlightTime_Timer()
     Dim fTime As Date
-
+    Dim UpdateInterval As Long
+    Static LastUpdateTime As Date
+    
+    'Do nothing if flight not running
     If (pos Is Nothing) Then Exit Sub
     
-    'Update flight time if not pasued/slewing
+    'Calculate true time since last update
+    If (Year(LastUpdateTime) > 2005) Then
+        UpdateInterval = CLng(DateDiff("s", LastUpdateTime, Now)) * 1000
+    Else
+        UpdateInterval = tmrFlightTime.interval
+    End If
+    
+    'Update the timers
+    LastUpdateTime = Now
     If Not pos.Paused And Not pos.Slewing Then
-        fTime = info.UpdateFlightTime(pos.simRate / 256, tmrFlightTime.interval)
+        fTime = info.UpdateFlightTime(pos.simRate / 256, UpdateInterval)
         sbMain.Panels(4).Text = "Flight Time: " + Format(fTime, "hh:mm:ss")
+    Else
+        info.UpdateFlightTime 0, tmrFlightTime.interval
     End If
         
     'Force the sim rate to be within the allowed range.
     CheckSimRate MINTIMECOMPRESSION, MAXTIMECOMPRESSION
 End Sub
 
+Private Sub tmrFSCheck_Timer()
+
+    'If we have the right role then abort
+    If (config.HasRole("HR") Or config.HasRole("PIREP") Or config.HasRole("Dispatch")) Then
+        tmrFSCheck.Enabled = False
+        Exit Sub
+    End If
+
+    'Abort if no longer connected or if we have started a flight
+    If Not config.ACARSConnected Or info.InFlight Then
+        tmrFSCheck.Enabled = False
+        Exit Sub
+    End If
+    
+    'Check if FS is running
+    If Not IsFSRunning Then
+        ShowMessage "Flight Simulator Stopped", ACARSERRORCOLOR
+        CloseACARSConnection
+    End If
+End Sub
+
 Private Sub tmrPosUpdates_Timer()
     Static LastPosUpdate As Date
+    Static LastAnyPosUpdate As Date
     Static LastATCUpdate As Date
     Static LastFlightSave As Date
     Static PauseStatus As Boolean
@@ -2240,7 +2506,7 @@ Private Sub tmrPosUpdates_Timer()
     'Get position data
     Set pos = RecordFlightData(acInfo)
     If (pos Is Nothing) Then
-        tmrPosUpdates.enabled = False
+        tmrPosUpdates.Enabled = False
         Exit Sub
     End If
     
@@ -2256,22 +2522,34 @@ Private Sub tmrPosUpdates_Timer()
 
     'Check if the flight phase has changed
     If Not isPaused Then
-        If PhaseChanged(pos) Then sbMain.Panels(2).Text = "Phase: " & info.PhaseName
+        If PhaseChanged(pos) Then
+            If config.ShowDebug Then ShowMessage "Phase changed to " & info.PhaseName, DEBUGTEXTCOLOR
+            sbMain.Panels(2).Text = "Phase: " & info.PhaseName
+            GAUGE_SetPhase info.FlightPhase, config.ACARSConnected
+        End If
     End If
-
+    
     'Check if it's time to send a position update.
     CurrentDate = Now
-    If (IsEmpty(LastPosUpdate)) Or (DateDiff("s", LastPosUpdate, CurrentDate) > config.PositionInterval) Then
+    If (IsEmpty(LastPosUpdate)) Or (DateDiff("s", LastPosUpdate, CurrentDate) >= config.PositionInterval) Then
         LastPosUpdate = CurrentDate
+        LastAnyPosUpdate = CurrentDate
         sbMain.Panels(3).Text = "Last Position Report: " & Format(LastPosUpdate, "hh:mm:ss")
         
         'Send data to the server. Otherwise save it.
         If config.ACARSConnected And (info.FlightID > 0) Then
-            SendPosition pos
+            SendPosition pos, True, False
         ElseIf IsDate(info.StartTime.UTCTime) And Not isPaused Then
             Positions.AddPosition pos
             sbMain.Panels(1).Text = "Status: Offline (Cache = " + Format(Positions.Size, "#,##0") + ")"
             If config.ShowDebug Then ShowMessage "Position Cache = " + Format(Positions.Size, "#,##0"), DEBUGTEXTCOLOR
+        End If
+    ElseIf (DateDiff("s", LastAnyPosUpdate, CurrentDate) > 10) And config.ACARSConnected Then
+        LastAnyPosUpdate = CurrentDate
+        If (info.FlightID > 0) Then
+            SendPosition pos, False, False
+            sbMain.Panels(3).Text = "Last Position Report: " & Format(Now, "hh:mm:ss")
+            If config.ShowDebug Then ShowMessage "Sent non-logged Position Update", DEBUGTEXTCOLOR
         End If
     End If
     
@@ -2284,8 +2562,17 @@ Private Sub tmrPosUpdates_Timer()
     End If
     
     'Check if it's time to save the flight
-    If (config.IsFS9 And (Not isPaused)) Then
-        If (IsEmpty(LastFlightSave) Or (DateDiff("s", LastFlightSave, CurrentDate) > 60)) Then
+    If (config.IsFS9 And Not isPaused) Then
+        Dim SaveInterval As Integer
+        
+        'Calculate save interval depending on LP Panel use
+        If acInfo.Payne7X7 Then
+            SaveInterval = 300
+        Else
+            SaveInterval = 90
+        End If
+    
+        If (IsEmpty(LastFlightSave) Or (DateDiff("s", LastFlightSave, CurrentDate) >= SaveInterval)) Then
             LastFlightSave = CurrentDate
             PersistFlightData
             SaveFlight
@@ -2297,10 +2584,15 @@ Private Sub tmrPosUpdates_Timer()
 
     'Calculate the update interval based on our phase/ground speed
     Dim newInterval As Integer
-    newInterval = UpdatePositionInterval()
+    newInterval = UpdatePositionInterval(acInfo)
     If (config.PositionInterval <> newInterval) Then
         config.PositionInterval = newInterval
         If config.ShowDebug Then ShowMessage "Position Interval set to " + CStr(newInterval) + "s", DEBUGTEXTCOLOR
+    ElseIf Not pos.ACARSConnected Then
+        GAUGE_SetPhase info.FlightPhase, config.ACARSConnected
+    ElseIf ((pos.ACARSPhase <> info.FlightPhase) And (info.FlightPhase <> UNKNOWN)) Then
+        ShowMessage "ACARS Gauge phase set to " + CStr(info.FlightPhase) + ", was " + CStr(pos.ACARSPhase), ACARSERRORCOLOR
+        GAUGE_SetPhase info.FlightPhase, config.ACARSConnected
     End If
 End Sub
 
@@ -2327,29 +2619,30 @@ Public Sub ToggleACARSConnection(Optional silent As Boolean = False)
         End If
     
         'Do the connection
-        cmdConnectDisconnect.enabled = False
+        cmdConnectDisconnect.Enabled = False
         On Error GoTo EH
         wsckMain.Close
         wsckMain.RemoteHost = config.ACARSHost
         wsckMain.RemotePort = config.ACARSPort
         config.SeenHELO = False
         wsckMain.Connect
-        frmMain.cmdPIREP.visible = info.FlightData
-        frmMain.cmdPIREP.enabled = info.FlightData
+        cmdPIREP.visible = info.FlightData
+        cmdPIREP.Enabled = info.FlightData
         LockUserInfo False
+        tmrFSCheck.Enabled = True
     Else
-        cmdConnectDisconnect.enabled = False
+        cmdConnectDisconnect.Enabled = False
         
         'Confirm disconnect if silent isn't set
         If Not silent Then
             If Not ConfirmDisconnect Then
-                cmdConnectDisconnect.enabled = True
+                cmdConnectDisconnect.Enabled = True
                 Exit Sub
             End If
         End If
         
-        CloseACARSConnection True
-        cmdConnectDisconnect.enabled = True
+        CloseACARSConnection
+        cmdConnectDisconnect.Enabled = True
         info.Offline = True
         frmMain.cmdPIREP.visible = False
         LockUserInfo True
@@ -2359,7 +2652,7 @@ ExitSub:
     Exit Sub
     
 EH:
-    cmdConnectDisconnect.enabled = True
+    cmdConnectDisconnect.Enabled = True
     If ((err.Number <> 40060) And (err.Number <> 10053)) Then
         MsgBox "The following error occurred: " & err.Description & " (" & err.Number & ")", vbOKOnly Or vbCritical, "ToggleACARSConnection.Error"
     End If
@@ -2369,7 +2662,7 @@ End Sub
 
 Private Sub tmrPing_Timer()
     If Not config.ACARSConnected Then
-        tmrPing.enabled = False
+        tmrPing.Enabled = False
         Exit Sub
     End If
     
@@ -2383,8 +2676,17 @@ End Sub
 
 Private Sub tmrStartCheck_Timer()
     Dim fdrData As PositionData
-    Static acInfo As AircraftInfo
 
+    'Check to see if FS has been started since we started
+    If IsFSRunning And Not config.FSUIPCConnected Then
+        FSUIPC_Connect
+        If config.FSUIPCConnected And config.ACARSConnected Then
+            GAUGE_SetStatus ACARS_CONNECTED
+        ElseIf config.FSUIPCConnected Then
+            GAUGE_SetStatus ACARS_ON
+        End If
+    End If
+        
     'Check if FS9 is running and FSUIPC is connected
     If Not IsFSReady Then Exit Sub
     
@@ -2396,44 +2698,46 @@ Private Sub tmrStartCheck_Timer()
     
     'Get flight data
     Set fdrData = RecordFlightData(acInfo)
-    If ((Not fdrData.Parked) And (Abs(fdrData.GroundSpeed) <= 3)) Then
-        Dim pushbackOff As Integer
-        Dim brakesOn As Integer
-        Dim dwResult As Long
-        
-        ShowMessage "Parkbrake = " + CStr(fdrData.Parked), DEBUGTEXTCOLOR
-        ShowMessage "GroundSpeed = " + CStr(fdrData.GroundSpeed), DEBUGTEXTCOLOR
+    If (fdrData Is Nothing) Then
+        tmrStartCheck.Enabled = False
+        Exit Sub
+    ElseIf (fdrData.ACARSPhase = PREFLIGHT) And Not info.InFlight Then
+        Dim ErrorMsg As String
     
-        'turn off pushback/turn on brakes gently
-        pushbackOff = 3
-        brakesOn = 10240
-        Call FSUIPC_Write(&H31F0, 2, VarPtr(pushbackOff), dwResult)
-        Call FSUIPC_Write(&HBC4, 2, VarPtr(brakesOn), dwResult)
-        Call FSUIPC_Write(&HBC6, 2, VarPtr(brakesOn), dwResult)
-        If Not FSUIPC_Process(dwResult) Then
-            ShowMessage "Error canceling pushback/start", ACARSERRORCOLOR
-            If config.ShowDebug Then ShowMessage "Disabling Flight Start Timer", DEBUGTEXTCOLOR
-            tmrStartCheck.enabled = False
+        'Ensure we can start
+        If Not ValidateFlightInfo(ErrorMsg, False) Then
+            PlaySoundFile "notify_error.wav"
+            ShowFSMessage ErrorMsg, True, 10
+            GAUGE_SetPhase info.FlightPhase, config.ACARSConnected
+            Exit Sub
+        ElseIf Not fdrData.Parked Then
+            'Cancel pushback and set parking brake
+            If Not SetParkBrake Then
+                If config.ShowDebug Then ShowMessage "Error disabling Flight Start Timer", DEBUGTEXTCOLOR
+                tmrStartCheck.Enabled = False
+            End If
+            
+            GAUGE_SetPhase info.FlightPhase, config.ACARSConnected
+            ShowFSMessage "Cannot Start Flight - Parking Brake released", True, 10
+            PlaySoundFile "notify_error.wav"
             Exit Sub
         End If
         
-        'Wait a teensy bit
-        Sleep 275
-        
-        'turn on parking brake
-        brakesOn = 0
-        pushbackOff = 32767
-        Call FSUIPC_Write(&HBC4, 2, VarPtr(brakesOn), dwResult)
-        Call FSUIPC_Write(&HBC6, 2, VarPtr(brakesOn), dwResult)
-        Call FSUIPC_Write(&HBC8, 2, VarPtr(pushbackOff), dwResult)
+        'Start the flight
+        StartFlight False
+    ElseIf (Not fdrData.Parked And (Abs(fdrData.GroundSpeed) <= 3)) Then
+        'Cancel pushback and set parking brake
+        If Not SetParkBrake Then
+            If config.ShowDebug Then ShowMessage "Disabling Flight Start Timer", DEBUGTEXTCOLOR
+            tmrStartCheck.Enabled = False
+            Exit Sub
+        End If
         
         'Write a message - this will write the calls above
         ShowFSMessage "Pushback Canceled - No Flight Started", True, 15
         PlaySoundFile "notify_error.wav"
-        If config.ShowDebug Then ShowMessage "Disabling Flight Start Timer", DEBUGTEXTCOLOR
-        tmrStartCheck.enabled = False
-    ElseIf (Abs(fdrData.GroundSpeed) > 3) Then
-        tmrStartCheck.enabled = False
+    ElseIf info.InFlight Or (Abs(fdrData.GroundSpeed) > 3) Then
+        tmrStartCheck.Enabled = False
         ShowMessage "Disabling Flight Start Timer", ACARSTEXTCOLOR
     End If
 End Sub
@@ -2499,7 +2803,7 @@ Private Sub txtAirportL_LostFocus()
 End Sub
 
 Private Sub txtCmd_KeyDown(KeyCode As Integer, Shift As Integer)
-    If KeyCode = 38 Then
+    If (KeyCode = 38) Then
         KeyCode = 0
         If blnFirstCmd Then Exit Sub
         If intCmdHistIndex > UBound(CmdHistory) Then
@@ -2533,22 +2837,23 @@ Private Sub txtCmd_KeyDown(KeyCode As Integer, Shift As Integer)
 End Sub
 
 Private Sub txtCmd_KeyPress(KeyAscii As Integer)
-    If (KeyAscii = 13) Then
-        KeyAscii = 0
-        If (txtCmd.Text <> "") Then
-            If Not blnFirstCmd Then
-                ReDim Preserve CmdHistory(UBound(CmdHistory) + 1) As String
-            Else
-                ReDim CmdHistory(0) As String
-                blnFirstCmd = False
-            End If
-            CmdHistory(UBound(CmdHistory)) = txtCmd.Text
-            ProcessUserInput CStr(txtCmd.Text)
-            txtCmd.Text = ""
-            strCmdBuffer = ""
-            intCmdBufferSel = 0
-            intCmdHistIndex = UBound(CmdHistory) + 1
+    If (KeyAscii <> 13) Then Exit Sub
+
+    KeyAscii = 0
+    If (txtCmd.Text <> "") Then
+        If Not blnFirstCmd Then
+            ReDim Preserve CmdHistory(UBound(CmdHistory) + 1) As String
+        Else
+            ReDim CmdHistory(0) As String
+            blnFirstCmd = False
         End If
+        
+        CmdHistory(UBound(CmdHistory)) = txtCmd.Text
+        ProcessUserInput CStr(txtCmd.Text)
+        txtCmd.Text = ""
+        strCmdBuffer = ""
+        intCmdBufferSel = 0
+        intCmdHistIndex = UBound(CmdHistory) + 1
     End If
 End Sub
 
@@ -2597,9 +2902,10 @@ End Sub
 Private Sub wsckMain_Close()
     Dim wasConnected As Boolean
 
+    On Error Resume Next
     wasConnected = config.ACARSConnected
-    CloseACARSConnection False
-    If config.FSUIPCConnected Then GAUGE_Disconnect
+    If config.ACARSConnected Then CloseACARSConnection
+    If config.FSUIPCConnected Then GAUGE_SetStatus ACARS_ON
     If wasConnected Then
         PlaySoundFile "notify_error.wav"
         ShowMessage "ACARS connection closed by server!", ACARSERRORCOLOR
@@ -2609,7 +2915,6 @@ End Sub
 
 Private Sub wsckMain_Connect()
     config.ACARSConnected = True
-    tmrPing.enabled = True
     cmdConnectDisconnect.Caption = "Disconnect"
     mnuConnect.Caption = "Disconnect"
     sbMain.Panels(1).Text = "Status: Connected"
@@ -2627,33 +2932,34 @@ Private Sub wsckMain_Connect()
         
         If config.ACARSConnected Then ToggleACARSConnection True
     Else
-        cmdConnectDisconnect.enabled = True
+        cmdConnectDisconnect.Enabled = True
         sbMain.Panels(1).Text = "Status: Connected to ACARS server"
+        tmrPing.Enabled = True
     End If
 End Sub
 
 Private Sub wsckMain_DataArrival(ByVal bytesTotal As Long)
     Dim strData As String
+    
+    TotalBytes = TotalBytes + bytesTotal
     wsckMain.GetData strData, vbString
     ProcessServerData strData
 End Sub
 
 Private Sub wsckMain_Error(ByVal Number As Integer, Description As String, ByVal Scode As Long, ByVal Source As String, ByVal HelpFile As String, ByVal HelpContext As Long, CancelDisplay As Boolean)
-    'If we get a 40006 or 10053 then toggle the ACARS connection
     PlaySoundFile "notify_error.wav"
+    CloseACARSConnection
+    
     If ((Number = 40006) Or (Number = 10053)) Then
-        CloseACARSConnection False
         If info.InFlight Then info.Offline = True
         ShowMessage "Lost Connection to ACARS Server", ACARSERRORCOLOR
-    ElseIf (Number = 10061) Then
-        CloseACARSConnection False
+    ElseIf (Number = 10061) Or (Number = 10013) Then
         If info.InFlight Then info.Offline = True
         ShowMessage "Cannot connect to ACARS Server at " + config.ACARSHost + ".", ACARSERRORCOLOR
         ShowMessage "Make sure your firewall is not blocking Port " + CStr(config.ACARSPort) + ".", _
             ACARSERRORCOLOR
     Else
         MsgBox "The following error occurred: " & Description & " (" & Number & ")", vbOKOnly Or vbCritical, "wsckMain.Error"
-        CloseACARSConnection False
     End If
 End Sub
 
@@ -2661,22 +2967,24 @@ Private Function ConfirmDisconnect() As Boolean
     ConfirmDisconnect = (MsgBox("Are you sure you want to disconnect?", vbYesNo Or vbQuestion, "Confirm") = vbYes)
 End Function
 
-Public Sub CloseACARSConnection(Optional blnSendQuit As Boolean = False)
+Public Sub CloseACARSConnection()
+    tmrPing.Enabled = False
+    tmrFSCheck.Enabled = False
     config.ACARSConnected = False
     
     'Disconnect
-    On Error Resume Next
     wsckMain.Close
-    On Error GoTo 0
     DoEvents
     
+    'Tell gauge we are disconnected
+    GAUGE_SetStatus ACARS_ON
+    
     'Update status
-    tmrPing.enabled = False
     sbMain.Panels(1).Text = "Status: Offline"
     mnuConnect.Caption = "Connect"
     cmdConnectDisconnect.Caption = "Connect"
-    cmdConnectDisconnect.enabled = True
-    mnuOptionsFlyOffline.enabled = True
+    cmdConnectDisconnect.Enabled = True
+    mnuOptionsFlyOffline.Enabled = True
     
     'Determine if we are dispatch
     If (config.HasRole("HR") Or config.HasRole("Dispatch")) Then
@@ -2685,8 +2993,8 @@ Public Sub CloseACARSConnection(Optional blnSendQuit As Boolean = False)
             ACARSTEXTCOLOR
     End If
     
-    txtPilotID.enabled = True
-    txtPassword.enabled = True
+    txtPilotID.Enabled = True
+    txtPassword.Enabled = True
     SSTab1.TabEnabled(1) = False
     SSTab1.TabEnabled(2) = False
     SSTab1.TabVisible(2) = False
@@ -2892,19 +3200,29 @@ Private Sub ProcessUserCmd(strInput As String)
             RequestRunwayInfo CStr(aryParts(0)), CStr(aryParts(1))
             ReqStack.Send
             
-        Case "com1"
-            Dim freq As String
-        
+        Case "com1", "com2"
             'Make sure a frequency was specified
-            If UBound(aryParts) < 1 Then
+            If (UBound(aryParts) < 1) Then
                 ShowMessage "No Frequency specified", ACARSERRORCOLOR
                 Exit Sub
             End If
             
             'Tune the COM1 radio to the frequency
-            freq = CStr(aryParts(1))
-            SetCOM1 freq
-            ShowMessage "COM1 Radio set to " + freq, ACARSTEXTCOLOR
+            If (cmdName = "com1") Then
+                SetCOM1 CStr(aryParts(1))
+            Else
+                SetCOM2 CStr(aryParts(1))
+            End If
+            
+        Case "adf"
+            'Make sure a frequency was specified
+            If (UBound(aryParts) < 1) Then
+                ShowMessage "No Frequency specified", ACARSERRORCOLOR
+                Exit Sub
+            End If
+            
+            'Tune the ADF radio
+            SetADF1 CStr(aryParts(1))
             
         Case "kick", "ban"
             'Check our access Make sure a Pilot ID was specified
@@ -2960,17 +3278,17 @@ Private Sub ProcessUserCmd(strInput As String)
             timeToC = (distanceC * 60&) / pos.GroundSpeed
             
             'Display distance
-            ShowMessage "Distance from " & info.airportD.name & ": " & CStr(distanceD) & " miles", ACARSTEXTCOLOR
-            ShowMessage "Distance to " & info.AirportA.name & ": " & CStr(distanceA) & " miles (" & _
+            ShowMessage "Distance from " & info.airportD.Name & ": " & CStr(distanceD) & " miles", ACARSTEXTCOLOR
+            ShowMessage "Distance to " & info.AirportA.Name & ": " & CStr(distanceA) & " miles (" & _
                 CStr(timeToA) & " minutes)", ACARSTEXTCOLOR
-            ShowMessage "Distance to " & AirportC.name & ": " & CStr(distanceC) & " miles (" & _
+            ShowMessage "Distance to " & AirportC.Name & ": " & CStr(distanceC) & " miles (" & _
                 CStr(timeToC) & " minutes)", ACARSTEXTCOLOR
             
             'Display alternate info
             If Not (info.AirportL Is Nothing) Then
                 distanceL = info.AirportL.DistanceTo(pos.Latitude, pos.Longitude)
                 timeToL = (distanceL * 60&) / pos.GroundSpeed
-                ShowMessage "Distance to " & info.AirportL.name & ": " & CStr(distanceL) & _
+                ShowMessage "Distance to " & info.AirportL.Name & ": " & CStr(distanceL) & _
                     " miles (" & CStr(timeToL) & " minutes)", ACARSTEXTCOLOR
             End If
         
@@ -3011,9 +3329,16 @@ Private Sub ProcessUserCmd(strInput As String)
                 ShowMessage ".pvtvoice - Tunes to DVA Private Voice Channel", ACARSTEXTCOLOR
             
             'Show admin commands
-            If config.HasRole("Admin") Then
+            If config.HasRole("Admin") And config.ACARSConnected Then
                 ShowMessage ".kick <pilot> - Remove Pilot", ACARSTEXTCOLOR
                 ShowMessage ".ban <pilot> - Remove Pilot and prevent logins", ACARSTEXTCOLOR
+            End If
+            
+            'Show radio tuning commands
+            If config.FSUIPCConnected Then
+                ShowMessage ".com1 <freq> - Set COM1 radio frequency", ACARSTEXTCOLOR
+                ShowMessage ".com2 <freq> - Set COM2 radio frequency", ACARSTEXTCOLOR
+                ShowMessage ".adf <freq> - Set ADF1 radio frequency", ACARSTEXTCOLOR
             End If
             
             ShowMessage ".help - Display this help screen", ACARSTEXTCOLOR
@@ -3025,20 +3350,20 @@ Private Sub ProcessUserCmd(strInput As String)
 End Sub
 
 Public Sub LockFlightInfo(IsEditable As Boolean)
-    txtFlightNumber.enabled = IsEditable
-    txtLeg.enabled = IsEditable
-    txtCruiseAlt.enabled = IsEditable
-    cboEquipment.enabled = IsEditable
-    cboAirline.enabled = IsEditable
-    cboNetwork.enabled = IsEditable
-    cboAirportD.enabled = IsEditable
-    txtAirportD.enabled = IsEditable
-    cboAirportA.enabled = IsEditable
-    txtAirportA.enabled = IsEditable
-    cboAirportL.enabled = IsEditable
-    txtAirportL.enabled = IsEditable
-    chkCheckRide.enabled = IsEditable
-    chkTrainFlight.enabled = IsEditable
+    txtFlightNumber.Enabled = IsEditable
+    txtLeg.Enabled = IsEditable
+    txtCruiseAlt.Enabled = IsEditable
+    cboEquipment.Enabled = IsEditable
+    cboAirline.Enabled = IsEditable
+    cboNetwork.Enabled = IsEditable
+    cboAirportD.Enabled = IsEditable
+    txtAirportD.Enabled = IsEditable
+    cboAirportA.Enabled = IsEditable
+    txtAirportA.Enabled = IsEditable
+    cboAirportL.Enabled = IsEditable
+    txtAirportL.Enabled = IsEditable
+    chkCheckRide.Enabled = IsEditable
+    chkTrainFlight.Enabled = IsEditable
 End Sub
 
 Public Sub ResetFlightInfo(Optional deleteSavedInfo As Boolean = True)
@@ -3060,8 +3385,8 @@ Public Sub ResetFlightInfo(Optional deleteSavedInfo As Boolean = True)
     chkCheckRide.value = 0
     chkTrainFlight.value = 0
     cmdPIREP.visible = False
-    cmdPIREP.enabled = False
-    cmdStartStopFlight.enabled = True
+    cmdPIREP.Enabled = False
+    cmdStartStopFlight.Enabled = True
     progressLabel.visible = False
     PositionProgress.visible = False
     LockFlightInfo True
@@ -3078,16 +3403,9 @@ Public Sub ResetFlightInfo(Optional deleteSavedInfo As Boolean = True)
 End Sub
 
 Private Sub LockUserInfo(IsEditable As Boolean)
-    txtPilotID.enabled = IsEditable
-    txtPassword.enabled = IsEditable
-End Sub
-
-Private Sub LimitLength(txt As TextBox, ByVal maxLen As Integer, Optional doUpperCase As Boolean = False)
-    If (Len(txt.Text) > maxLen) Then txt.Text = Left(txt.Text, maxLen)
-    If (doUpperCase And (UCase(txt.Text) <> txt.Text)) Then
-        txt.Text = UCase(txt.Text)
-        txt.SelStart = Len(txt.Text)
-    End If
+    txtPilotID.Enabled = IsEditable
+    txtPassword.Enabled = IsEditable
+    chkStealth.Enabled = IsEditable
 End Sub
 
 Private Sub SelectField(txt As TextBox)

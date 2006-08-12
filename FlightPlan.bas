@@ -81,7 +81,7 @@ Public Sub FPlan_Open()
             'If we're using a 707/720, offer to write the flight plan
             Dim eqType As String
             eqType = Left(info.EquipmentType, 4)
-            If ((eqType = "B707") Or (eqType = "B720")) Then
+            If ((Left(eqType, 4) = "B707") Or (Left(eqType, 4) = "B720")) Then
                 If (MsgBox("Do you want to save this as a Boeing 707 INS flight plan?", _
                     vbYesNo + vbQuestion, "707 INS Flight Plan") = vbYes) Then
                         If (x < 25) Then
@@ -103,9 +103,12 @@ End Sub
 Public Sub SB3Plan_Save()
     Dim planFileName As String
     
+    'Check that airports are set
+    If ((info.airportD Is Nothing) Or (info.AirportA Is Nothing)) Then Exit Sub
+    
     'Get the path/dialog options
     With frmMain.CommonDialog1
-        .FileName = frmMain.CommonDialog1.InitDir + info.airportD.ICAO + "-" + info.AirportA.ICAO + ".sfp"
+        .FileName = info.airportD.ICAO + "-" + info.AirportA.ICAO + ".sfp"
         .CancelError = True
         .DialogTitle = "Save Squawkbox 3 Flight Plan"
         .Filter = "Squawkbox 3 Flight Plans (*.sfp)|*.sfp"

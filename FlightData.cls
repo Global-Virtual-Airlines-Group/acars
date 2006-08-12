@@ -17,6 +17,7 @@ Option Explicit
 Public FlightID As Long
 Public CheckRide As Boolean
 Public TestFlight As Boolean
+Public FuelLoaded As Boolean
 
 Public EquipmentType As String
 Public FlightNumber As Integer
@@ -37,6 +38,7 @@ Public FSVersion As Integer
 Public Offline As Boolean
 
 'Log time at different sim rates
+Private Time0X As Long
 Private Time1X As Long
 Private Time2X As Long
 Private Time4X As Long
@@ -82,14 +84,16 @@ Public PIREPFiled As Boolean
 
 Sub Class_Initialize()
     PhaseNames = Array("N/A", "Pre-Flight", "Pushback", "Taxi Out", "Takeoff", "Airborne", _
-        "Landed", "Taxi In", "At Gate", "Shutdown", "Complete", "Aborted", "Error")
+        "Landed", "Taxi In", "At Gate", "Shutdown", "Complete", "Aborted", "Error", _
+        "PIREP File")
     Network = "Offline"
     FlightPhase = UNKNOWN
     InFlight = False
     FlightData = False
     PIREPFiled = False
     Offline = False
-    Set Airline = New Airline
+    Set Airline = config.GetAirline(LoadResString(101))
+    FlightLeg = 1
 End Sub
 
 'Start a new flight
@@ -100,6 +104,10 @@ Sub StartFlight(Optional isOnline As Boolean = True)
     Offline = Not isOnline
     FlightPhase = PREFLIGHT
     StartTime.LocalTime = Now
+    Time0X = 0
+    Time1X = 0
+    Time2X = 0
+    Time4X = 0
 End Sub
 
 Property Get PhaseName() As String
@@ -125,6 +133,8 @@ Function UpdateFlightTime(ByVal simRate As Integer, ByVal interval As Integer) A
 
     interval = interval * simRate
     Select Case (simRate)
+        Case 0
+            Time0X = Time0X + interval
         Case 1
             Time1X = Time1X + interval
         Case 2
@@ -137,6 +147,14 @@ Function UpdateFlightTime(ByVal simRate As Integer, ByVal interval As Integer) A
     tmpS = FlightTime Mod 3600
     UpdateFlightTime = TimeSerial(Fix(FlightTime / 3600), Fix(tmpS / 60), tmpS Mod 60)
 End Function
+
+Property Get TimePaused() As Long
+    TimePaused = Time0X / 1000
+End Property
+
+Property Let TimePaused(ByVal ms As Long)
+    Time0X = ms * 1000
+End Property
 
 Property Get TimeAt1X() As Long
     TimeAt1X = Time1X / 1000
