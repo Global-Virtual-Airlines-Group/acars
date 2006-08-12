@@ -13,12 +13,13 @@ Attribute VB_PredeclaredId = False
 Attribute VB_Exposed = False
 Option Explicit
 
-Public id As String
+Public ID As String
 Public FirstName As String
 Public LastName As String
 Public Rank As String
 Public EquipmentType As String
 Public IsBusy As Boolean
+Public IsHidden As Boolean
 
 Private Roles As Variant
 
@@ -28,7 +29,7 @@ Public Hours As Double
 Public flightCode As String
 Public FlightEQ As String
 
-Public AirportD As Airport
+Public airportD As Airport
 Public AirportA As Airport
 
 Public StartTime As Date
@@ -36,8 +37,8 @@ Public ClientBuild As Integer
 Public RemoteAddress As String
 Public RemoteHost As String
 
-Property Get Name() As String
-    Name = FirstName + " " + LastName
+Property Get name() As String
+    name = FirstName + " " + LastName
 End Property
 
 Property Get FlightTotals() As String

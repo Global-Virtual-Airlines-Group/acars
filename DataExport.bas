@@ -10,21 +10,21 @@ Public Sub WriteCSV(ByVal fName As String, posData As Variant)
     fNum = FreeFile()
     Open fName + ".csv" For Output As #fNum
     Print #fNum, "; Date / Time,Latitude,Longitude,Altitude,Heading,Air Speed," & _
-            "Ground Speed,Vertical Speed,N1,N2,Bank,Pitch,Flaps,WindSpeed,WindHdg," & _
-            "Fuel Flow,Gs,AOA"
+            "Ground Speed,Vertical Speed,N1,N2,Bank,Pitch,Flaps,Wind Speed,WindHdg," & _
+            "Fuel Flow,Gs,AOA,Frame Rate"
             
     'Write position data
     For x = 0 To UBound(posData)
         Set cPos = posData(x)
         Print #fNum, FormatDateTime(cPos.DateTime.UTCTime, "mm/dd/yyyy hh:nn:ss") + "," + _
             FormatNumber(cPos.Latitude, "#0.00000") + "," + FormatNumber(cPos.Longitude, "##0.00000") _
-            + "," + CStr(cPos.AltitudeMSL) + "," + CStr(cPos.Heading), "," + CStr(cPos.AirSpeed) _
+            + "," + CStr(cPos.AltitudeMSL) + "," + CStr(cPos.Heading), "," + CStr(cPos.Airspeed) _
             + "," + CStr(cPos.GroundSpeed) + "," + CStr(cPos.VerticalSpeed) + "," + _
             FormatNumber(cPos.AverageN1, "##0.0") + "," + FormatNumber(cPos.AverageN2, "##0.0") _
             + "," + FormatNumber(cPos.Bank, "#0.000") + "," + FormatNumber(cPos.Pitch, "#0.000") _
             + "," + CStr(cPos.Flaps) + "," + CStr(cPos.WindSpeed) + "," + CStr(cPos.WindHeading) _
             + "," + CStr(cPos.FuelFlow) + "," + FormatNumber(cPos.GForce, "#0.000") + "," + _
-            FormatNumber(cPos.AngleOfAttack, "#0.000")
+            FormatNumber(cPos.AngleOfAttack, "#0.000") + "," + CStr(cPos.FrameRate)
     Next
     
     Close #fNum
@@ -64,7 +64,7 @@ Public Sub WriteKML(ByVal fName As String, posData As Variant, info As FlightDat
     xdoc.appendChild pi
     
     'Build the departure/takeoff data
-    apInfo = "Departed from " & info.airportD.name & " at " & CStr(info.TakeoffTime.LocalTime) & "<br />" & _
+    apInfo = "Departed from " & info.airportD.Name & " at " & CStr(info.TakeoffTime.LocalTime) & "<br />" & _
         CStr(info.TakeoffSpeed) & " knots, " & CStr(info.TakeoffN1) & "% N<sub>1</sub>, " & _
         CStr(info.TakeoffWeight) & " lbs total, " & CStr(info.TakeoffFuel) & " lbs fuel<br />"
     doc.appendChild createAirport(info.airportD, apInfo)
@@ -74,7 +74,7 @@ Public Sub WriteKML(ByVal fName As String, posData As Variant, info As FlightDat
     doc.appendChild createPositionData(posData, False)
     
     'Build the arrival/landing data
-    apInfo = "Landed at " & info.AirportA.name & " at " & CStr(info.LandingTime.LocalTime) & "<br />" & _
+    apInfo = "Landed at " & info.AirportA.Name & " at " & CStr(info.LandingTime.LocalTime) & "<br />" & _
         CStr(info.LandingSpeed) & " knots, " & CStr(info.LandingVSpeed) & " feet/min, " & _
         CStr(info.LandingN1) & "% N<sub>1</sub>, " & CStr(info.LandingWeight) & " lbs total, " & _
         CStr(info.LandingFuel) & " lbs fuel<br />"
@@ -82,7 +82,7 @@ Public Sub WriteKML(ByVal fName As String, posData As Variant, info As FlightDat
     
     'Save the XML data
     Dim sha As New SHA256
-    shaData = sha.SHA256(doc.XML, "$hashSalt")
+    shaData = sha.SHA256(doc.XML, "ha$h-Salt-ACARS-Value")
     
     'Write the document to disk
     fNum = FreeFile()
@@ -105,20 +105,20 @@ FatalError:
     
 End Sub
 
-Public Sub BuildPackage(ByVal name As String, Optional deleteFiles As Boolean = False)
+Public Sub BuildPackage(ByVal Name As String, Optional deleteFiles As Boolean = False)
     Dim z As New ZipClass
 
-    z.AddFile name & ".csv"
-    z.AddFile name & ".kml"
-    z.AddFile name & ".sha"
-    z.Comment = "ACARS Flight " & name
-    z.WriteZip name & ".zip"
+    z.AddFile Name & ".csv"
+    z.AddFile Name & ".kml"
+    z.AddFile Name & ".sha"
+    z.Comment = "ACARS Flight " & Name
+    z.WriteZip Name & ".zip"
     
     'Delete the files if requested
     If deleteFiles Then
         On Error Resume Next
-        Kill name & ".csv"
-        Kill name & ".kml"
-        Kill name & ".sha"
+        Kill Name & ".csv"
+        Kill Name & ".kml"
+        Kill Name & ".sha"
     End If
 End Sub

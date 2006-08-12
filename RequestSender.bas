@@ -234,6 +234,11 @@ End Sub
 
 Public Function SendCredentials(userID As String, pwd As String) As Long
     Dim cmd As IXMLDOMElement
+    Dim isStealth As Boolean
+    
+    'Log stealth mode
+    isStealth = (frmMain.chkStealth.value = 1) And config.HasRole("HR")
+    If isStealth Then ShowMessage "Hidden/Stealth Connection", DEBUGTEXTCOLOR
 
     'Build the request
     Set cmd = buildCMD("auth")
@@ -241,7 +246,8 @@ Public Function SendCredentials(userID As String, pwd As String) As Long
     'Add user and password
     AddXMLField cmd, "user", userID, False
     AddXMLField cmd, "password", pwd, True
-    AddXMLField cmd, "build", App.Revision, False
+    AddXMLField cmd, "build", CStr(App.Revision), False
+    AddXMLField cmd, "stealth", CStr(isStealth), False
     ReqStack.Queue cmd
 
     If config.ShowDebug Then ShowMessage "Logging In", DEBUGTEXTCOLOR
@@ -314,7 +320,8 @@ Public Sub SendKick(ByVal PilotID As String, Optional banAddr As Boolean = False
     If config.ShowDebug Then ShowMessage "Sent kick request", DEBUGTEXTCOLOR
 End Sub
 
-Public Function SendPosition(ByVal cPos As PositionData, Optional noFlood As Boolean = False) As Long
+Public Function SendPosition(ByVal cPos As PositionData, ByVal IsLogged As Boolean, _
+    ByVal noFlood As Boolean) As Long
     Dim cmd As IXMLDOMElement
 
     'Build the request
@@ -326,7 +333,7 @@ Public Function SendPosition(ByVal cPos As PositionData, Optional noFlood As Boo
     AddXMLField cmd, "msl", cPos.AltitudeMSL, False
     AddXMLField cmd, "agl", cPos.AltitudeAGL, False
     AddXMLField cmd, "hdg", cPos.Heading, False
-    AddXMLField cmd, "aSpeed", cPos.AirSpeed, False
+    AddXMLField cmd, "aSpeed", cPos.Airspeed, False
     AddXMLField cmd, "gSpeed", cPos.GroundSpeed, False
     AddXMLField cmd, "vSpeed", cPos.VerticalSpeed, False
     AddXMLField cmd, "aoa", FormatNumber(cPos.AngleOfAttack, "#0.000"), False
@@ -340,13 +347,15 @@ Public Function SendPosition(ByVal cPos As PositionData, Optional noFlood As Boo
     AddXMLField cmd, "phase", cPos.phase, False
     AddXMLField cmd, "simrate", CStr(cPos.simRate / 256), False
     AddXMLField cmd, "flaps", CStr(cPos.Flaps), False
-    AddXMLField cmd, "fuel", CStr(cPos.fuel), False
+    AddXMLField cmd, "fuel", CStr(cPos.Fuel), False
     AddXMLField cmd, "weight", CStr(cPos.weight), False
     AddXMLField cmd, "wHdg", CStr(cPos.WindHeading), False
     AddXMLField cmd, "wSpeed", CStr(cPos.WindSpeed), False
     AddXMLField cmd, "date", FormatDateTime(cPos.DateTime.UTCTime, "mm/dd/yyyy hh:nn:ss")
     AddXMLField cmd, "flags", CStr(cPos.Flags), False
+    AddXMLField cmd, "frameRate", CStr(cPos.FrameRate), False
     If noFlood Then AddXMLField cmd, "noFlood", "true", False
+    If Not IsLogged Then AddXMLField cmd, "isLogged", "false", False
 
     'Send the request
     ReqStack.Queue cmd
@@ -388,6 +397,7 @@ Public Function SendPIREP(info As FlightData) As Long
     AddXMLField cmd, "gateTime", FormatDateTime(info.GateTime.UTCTime, "mm/dd/yyyy hh:nn:ss")
     AddXMLField cmd, "gateFuel", CStr(info.GateFuel), False
     AddXMLField cmd, "gateWeight", CStr(info.GateWeight), False
+    AddXMLField cmd, "time0X", CStr(info.TimePaused), False
     AddXMLField cmd, "time1X", CStr(info.TimeAt1X), False
     AddXMLField cmd, "time2X", CStr(info.TimeAt2X), False
     AddXMLField cmd, "time4X", CStr(info.TimeAt4X), False

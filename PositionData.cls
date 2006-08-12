@@ -16,6 +16,7 @@ Option Explicit
 'Date/time of flight data
 Public DateTime As New UTCDate
 Public phase As String
+Public FrameRate As Integer
 
 'Latitude/longitude
 Public Latitude As Double
@@ -23,7 +24,7 @@ Public Longitude As Double
     
 'Current parameters
 Public Mach As Double
-Public AirSpeed As Integer
+Public Airspeed As Integer
 Public GroundSpeed As Integer
 Public VerticalSpeed As Integer
 Public TouchdownSpeed As Integer
@@ -50,6 +51,8 @@ Public AfterBurner As Boolean
 Public Parked As Boolean
 Public simRate As Integer
 Public CockpitView As Boolean
+Public Stall As Boolean
+Public Overspeed As Boolean
 
 'Autopilot flags
 Public AP_HDG As Boolean
@@ -68,8 +71,13 @@ Private engFlow(3) As Long
 Private engCount As Integer
 
 'Fuel/Weight state
-Public fuel As Long
+Public Fuel As Long
 Public weight As Long
+
+'Gauge state
+Public ACARSConnected As Boolean
+Public ACARSPhase As Byte
+Public SwitchCOM As Boolean
 
 Public Sub setN1(ByVal engNum As Byte, n1 As Double)
     engN1(engNum) = n1
@@ -105,6 +113,10 @@ End Function
 
 Property Let EngineCount(ByVal eCount As Integer)
     engCount = eCount
+End Property
+
+Property Get EngineCount() As Integer
+    EngineCount = engCount
 End Property
 
 Property Get AverageN1() As Double
@@ -168,6 +180,8 @@ Private Sub Class_Initialize()
     EnginesStarted = False
     Parked = False
     AfterBurner = False
+    Stall = False
+    Overspeed = False
 End Sub
 
 Property Get Flags() As Long
@@ -176,13 +190,15 @@ Property Get Flags() As Long
     tmpFlags = 0
     
     'Build the flags
-    If Paused Then tmpFlags = tmpFlags Or FLIGHTPAUSED
-    If Slewing Then tmpFlags = tmpFlags Or FLIGHTSLEWING
-    If Parked Then tmpFlags = tmpFlags Or FLIGHTPARKED
-    If onGround Then tmpFlags = tmpFlags Or FLIGHTONGROUND
+    If Paused Then tmpFlags = tmpFlags Or FLIGHT_PAUSED
+    If Slewing Then tmpFlags = tmpFlags Or FLIGHT_SLEWING
+    If Parked Then tmpFlags = tmpFlags Or FLIGHT_PARKED
+    If onGround Then tmpFlags = tmpFlags Or FLIGHT_ONGROUND
     If Spoilers Then tmpFlags = tmpFlags Or FLIGHT_SP_ARM
     If GearDown Then tmpFlags = tmpFlags Or FLIGHT_GEAR_DOWN
     If AfterBurner Then tmpFlags = tmpFlags Or FLIGHT_AFTERBURNER
+    If Overspeed Then tmpFlags = tmpFlags Or FLIGHT_OVERSPEED
+    If Stall Then tmpFlags = tmpFlags Or FLIGHT_STALL
     If AP_NAV Then tmpFlags = tmpFlags Or FLIGHT_AP_NAV
     If AP_GPS Then tmpFlags = tmpFlags Or FLIGHT_AP_GPS
     If AP_HDG Then tmpFlags = tmpFlags Or FLIGHT_AP_HDG
@@ -197,7 +213,7 @@ End Property
 Property Get WarningCode() As Integer
 
     WarningCode = 0
-    If ((AirSpeed >= 250) And (AltitudeMSL < 10000)) Then
+    If ((Airspeed >= 250) And (AltitudeMSL < 10000)) Then
         WarningCode = 1
         'above 250 under 10k
     ElseIf ((AltitudeAGL < 1500) And (VerticalSpeed < -1500)) Then
@@ -212,5 +228,11 @@ Property Get WarningCode() As Integer
     ElseIf (Abs(1 - GForce) > 0.25) Then
         WarningCode = 5
         'excessive Gs
+    ElseIf Stall Then
+        WarningCode = 6
+        'Stall
+    ElseIf Overspeed Then
+        WarningCode = 7
+        'Overspeed
     End If
 End Property

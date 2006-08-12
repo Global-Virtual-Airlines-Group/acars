@@ -63,7 +63,7 @@ Public Sub ProcessMessage(ByVal msgText As String)
             Select Case ReqID
                 Case info.AuthReqID
                     info.AuthReqID = 0
-                    frmMain.CloseACARSConnection False
+                    frmMain.CloseACARSConnection
                     MsgBox "The following error occurred while attempting to connect to the ACARS server:" & vbCrLf & vbCrLf & getChild(cmd, "error", "?"), vbOKOnly Or vbExclamation, "Error"
                 Case Else
                     MsgBox "The following error occurred:" & vbCrLf & vbCrLf & getChild(cmd, "error", "?"), vbOKOnly Or vbExclamation, "Error"
@@ -128,7 +128,7 @@ Private Sub ProcessACK(cmdNode As IXMLDOMNode)
         'Enable stuff and update status
         frmMain.sbMain.Panels(1).Text = "Status: Logged in to ACARS server"
         frmMain.SSTab1.TabEnabled(1) = True
-        frmMain.mnuOptionsFlyOffline.enabled = False
+        frmMain.mnuOptionsFlyOffline.Enabled = False
         
         'Display newer build if available
         newBuild = CInt(getChild(cmdNode, "latestBuild", "0"))
@@ -136,7 +136,7 @@ Private Sub ProcessACK(cmdNode As IXMLDOMNode)
             ShowMessage "A new ACARS version (Build " + CStr(newBuild) + ") is available.", ACARSTEXTCOLOR
             PlaySoundFile "notify_newversion.wav"
         Else
-            PlaySoundFile "notify_msg.wav"
+            PlaySoundFile "notify_welcome.wav"
         End If
         
         'Get role names
@@ -162,6 +162,13 @@ Private Sub ProcessACK(cmdNode As IXMLDOMNode)
             Exit Sub
         End If
         
+        'Hide the stealth box
+        If Not config.HasRole("HR") Then
+            frmMain.chkStealth.value = 0
+            frmMain.chkStealth.visible = False
+            frmMain.chkStealth.Enabled = False
+        End If
+        
         'Get unrestricted flag
         config.NoMessages = CBool(getChild(cmdNode, "noMsgs", "false"))
         config.IsUnrestricted = CBool(getChild(cmdNode, "unrestricted", "false")) And Not config.NoMessages
@@ -178,6 +185,9 @@ Private Sub ProcessACK(cmdNode As IXMLDOMNode)
             RequestAirports
             RequestAirlines
         End If
+        
+        'Tell the gauge we are connected
+        GAUGE_SetStatus ACARS_CONNECTED
         
         'Request Pilot List/SB3 Privat voice
         If config.SB3Support Then RequestPrivateVoiceURL
@@ -263,7 +273,7 @@ Private Sub ProcessChatText(cmdNode As IXMLDOMNode)
     msgText = getChild(cmdNode, "text", "")
     msgFrom = getChild(cmdNode, "from", "SYSTEM")
     If (msgFrom <> "SYSTEM") Then Set p = users.GetPilot(msgFrom)
-    If (Not (p Is Nothing) And config.ShowPilotNames) Then msgFrom = p.name
+    If (Not (p Is Nothing) And config.ShowPilotNames) Then msgFrom = p.Name
 
     'Check if there is a "To" element. If so, it's a private message.
     config.MsgReceived = True
@@ -317,7 +327,7 @@ Private Sub ProcessDataResponse(cmdNode As IXMLDOMNode)
     For Each rspNode In rspNodes
         Select Case LCase(rspNode.Text)
             Case "pilotlist"
-                Dim name As String
+                Dim Name As String
                 OldDispatch = users.DispatchOnline
                 
                 If config.ShowDebug Then ShowMessage "Updating Pilot List", DEBUGTEXTCOLOR
@@ -340,12 +350,17 @@ Private Sub ProcessDataResponse(cmdNode As IXMLDOMNode)
                     p.RemoteAddress = getChild(pNode, "remoteaddr", "???")
                     p.RemoteHost = getChild(pNode, "remotehost", "???")
                     p.IsBusy = CBool(getChild(pNode, "isBusy", "false"))
+                    p.IsHidden = CBool(getChild(pNode, "isHidden", "false"))
                     p.SetRoles getChild(pNode, "roles", "Pilot")
                 
                     'Check if the ID is ours
                     If (p.ID <> "") Then
                         users.AddPilot p
-                        If (UCase(p.ID) = UCase(frmMain.txtPilotID.Text)) Then frmMain.txtPilotName.Text = p.name
+                        If (UCase(p.ID) = UCase(frmMain.txtPilotID.Text)) Then
+                            frmMain.txtPilotName.Text = p.Name
+                            frmMain.txtPilotName.visible = True
+                            frmMain.lblName.visible = True
+                        End If
                     End If
                 Next
                 
@@ -385,13 +400,14 @@ Private Sub ProcessDataResponse(cmdNode As IXMLDOMNode)
                     p.RemoteAddress = getChild(pNode, "remoteaddr", "???")
                     p.RemoteHost = getChild(pNode, "remotehost", "???")
                     p.IsBusy = CBool(getChild(pNode, "isBusy", "false"))
+                    p.IsHidden = CBool(getChild(pNode, "isHidden", "false"))
                     p.SetRoles getChild(pNode, "roles", "Pilot")
 
                     'Send login message
                     If (p.ID <> "") Then
                         Set oldPilot = users.GetPilot(p.ID)
                         users.AddPilot p
-                        If (oldPilot Is Nothing) Then ShowMessage p.name + " (" + p.ID + _
+                        If (oldPilot Is Nothing) Then ShowMessage p.Name + " (" + p.ID + _
                             ") logged into the ACARS server.", SYSMSGCOLOR
                     End If
                 Next
@@ -421,7 +437,7 @@ Private Sub ProcessDataResponse(cmdNode As IXMLDOMNode)
                     p.LastName = getChild(pNode, "lastname", "")
 
                     users.DeletePilot p.ID
-                    ShowMessage p.name + " (" + p.ID + ") logged out from the ACARS server.", SYSMSGCOLOR
+                    ShowMessage p.Name + " (" + p.ID + ") logged out from the ACARS server.", SYSMSGCOLOR
                 Next
                 
                 'Update the Pilot List
@@ -446,7 +462,7 @@ Private Sub ProcessDataResponse(cmdNode As IXMLDOMNode)
                     ctr.ID = getAttr(pNode, "code", "?")
                     ctr.NetworkID = getAttr(pNode, "networkID", "000000")
                     ctr.Frequency = getAttr(pNode, "freq", "199.98")
-                    ctr.name = getAttr(pNode, "name", "???")
+                    ctr.Name = getAttr(pNode, "name", "???")
                     ctr.Rating = getAttr(pNode, "rating", "Observer")
                     ctr.FacilityType = getAttr(pNode, "type", "Center")
                     
@@ -478,27 +494,35 @@ Private Sub ProcessDataResponse(cmdNode As IXMLDOMNode)
             
                 'If we have a frequency, update the NAV1 radio
                 If (freq <> "") Then
-                    setNAV1 freq, CInt(getAttr(pNode, "hdg", ""))
+                    SetNAV1 freq, CInt(getAttr(pNode, "hdg", ""))
                     ShowMessage "NAV1 Radio set to " + freq, ACARSTEXTCOLOR
                 End If
             
             Case "navaid"
+                Dim navType As String
+                Dim RadioCode As String
+                
                 'Get the navaid info
                 Set pNode = cmdNode.selectSingleNode("navaid")
                 If (pNode Is Nothing) Then Exit Sub
                 Set pNode = pNode.selectSingleNode("navaid")
                 If (pNode Is Nothing) Then Exit Sub
             
-                'Set stuff based on navaid type
+                'Set stuff based on navaid type. Override if necessary
+                navType = UCase(getChild(pNode, "type", "VOR"))
+                RadioCode = UCase(getChild(pNode, "radio", ""))
+                If (navType = "NDB") Then RadioCode = "ADF"
+                
                 freq = getChild(pNode, "freq", "")
-                Select Case getChild(pNode, "radio", "")
-                    Case "nav1"
-                        setNAV1 freq, CInt(getChild(pNode, "hdg", ""))
-                        ShowMessage "NAV1 Radio set to " + freq, ACARSTEXTCOLOR
+                Select Case RadioCode
+                    Case "NAV1"
+                        SetNAV1 freq, CInt(getChild(pNode, "hdg", "0"))
                     
-                    Case "nav2"
+                    Case "NAV2"
                         SetNAV2 freq
-                        ShowMessage "NAV2 Radio set to " + freq, ACARSTEXTCOLOR
+                        
+                    Case "ADF"
+                        SetADF1 freq
                 End Select
             
             Case "airports"
@@ -513,7 +537,7 @@ Private Sub ProcessDataResponse(cmdNode As IXMLDOMNode)
                         Set a = New Airport
                         a.ICAO = getAttr(pNode, "icao")
                         a.IATA = getAttr(pNode, "iata")
-                        a.name = Replace(getAttr(pNode, "name", a.ICAO), ",", "")
+                        a.Name = Replace(getAttr(pNode, "name", a.ICAO), ",", "")
                         a.Latitude = CDbl(Replace(getAttr(pNode, "lat", "0"), ".", config.DecimalSeparator))
                         a.Longitude = CDbl(Replace(getAttr(pNode, "lng", "0"), ".", config.DecimalSeparator))
                         config.AddAirport a
@@ -534,7 +558,7 @@ Private Sub ProcessDataResponse(cmdNode As IXMLDOMNode)
                         config.AddAirline getAttr(pNode, "code"), getAttr(pNode, "name")
                     Next
                     
-                    SetComboChoices frmMain.cboAirline, config.AirlineNames, info.Airline.name, "-"
+                    SetComboChoices frmMain.cboAirline, config.AirlineNames, info.Airline.Name, "-"
                     If config.ShowDebug Then ShowMessage "Updated Airline List", DEBUGTEXTCOLOR
                     config.SaveAirlines
                 End If

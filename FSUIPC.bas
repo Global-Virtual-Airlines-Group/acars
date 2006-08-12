@@ -177,7 +177,10 @@ Public Type FS6IPC_WRITESTATEDATA_HDR
 End Type
 
 '--- Stop the Client ---------------------------------------------------------
-Sub FSUIPC_Close()
+Sub FSUIPC_Close(Optional SendGaugeInfo As Boolean = True)
+
+    If SendGaugeInfo Then GAUGE_SetStatus ACARS_OFF
+    config.FSUIPCConnected = False
 
   m_hWnd = 0
   m_msg = 0

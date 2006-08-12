@@ -77,6 +77,7 @@ Public Sub PersistFlightData(Optional writeMsg As Boolean = False)
     AddXMLField inf, "shutdownTime", FormatDateTime(info.ShutdownTime.UTCTime, "mm/dd/yyyy hh:nn:ss")
     AddXMLField inf, "shutdownFuel", CStr(info.ShutdownFuel), False
     AddXMLField inf, "shutdownWeight", CStr(info.ShutdownWeight), False
+    AddXMLField inf, "time0X", CStr(info.TimePaused), False
     AddXMLField inf, "time1X", CStr(info.TimeAt1X), False
     AddXMLField inf, "time2X", CStr(info.TimeAt2X), False
     AddXMLField inf, "time4X", CStr(info.TimeAt4X), False
@@ -113,7 +114,7 @@ Public Sub PersistFlightData(Optional writeMsg As Boolean = False)
             AddXMLField e, "msl", cPos.AltitudeMSL, False
             AddXMLField e, "agl", cPos.AltitudeAGL, False
             AddXMLField e, "hdg", cPos.Heading, False
-            AddXMLField e, "aSpeed", cPos.AirSpeed, False
+            AddXMLField e, "aSpeed", cPos.Airspeed, False
             AddXMLField e, "gSpeed", cPos.GroundSpeed, False
             AddXMLField e, "vSpeed", cPos.VerticalSpeed, False
             AddXMLField e, "pitch", FormatNumber(cPos.Pitch, "#0.000"), False
@@ -127,11 +128,11 @@ Public Sub PersistFlightData(Optional writeMsg As Boolean = False)
             AddXMLField e, "phase", cPos.phase, False
             AddXMLField e, "simrate", CStr(cPos.simRate / 256), False
             AddXMLField e, "flaps", CStr(cPos.Flaps), False
-            AddXMLField e, "fuel", CStr(cPos.fuel), False
+            AddXMLField e, "fuel", CStr(cPos.Fuel), False
             AddXMLField e, "weight", CStr(cPos.weight), False
             AddXMLField e, "wHdg", CStr(cPos.WindHeading), False
             AddXMLField e, "wSpeed", CStr(cPos.WindSpeed), False
-            
+            AddXMLField e, "frameRate", CStr(cPos.FrameRate), False
             AddXMLField e, "date", FormatDateTime(cPos.DateTime.UTCTime, "mm/dd/yyyy hh:nn:ss")
             AddXMLField e, "flags", CStr(cPos.Flags), False
 
@@ -306,6 +307,7 @@ Public Function RestoreFlightData(ByVal flightCode As String) As SavedFlight
         If (Year(.ShutdownTime.UTCTime) < 2000) Then .ShutdownTime.UTCTime = .LandingTime.UTCTime
         .ShutdownFuel = CLng(getChild(inf, "shutdownFuel", "0"))
         .ShutdownWeight = CLng(getChild(inf, "shutdownWeight", "0"))
+        .TimePaused = CLng(getChild(inf, "time0X", "0"))
         .TimeAt1X = CLng(getChild(inf, "time1X", "0"))
         .TimeAt2X = CLng(getChild(inf, "time2X", "0"))
         .TimeAt4X = CLng(getChild(inf, "time4X", "0"))
@@ -336,7 +338,7 @@ Public Function RestoreFlightData(ByVal flightCode As String) As SavedFlight
             sPos.AltitudeMSL = CLng(getChild(p, "msl", "0"))
             sPos.AltitudeAGL = CLng(getChild(p, "agl", "0"))
             sPos.Heading = CInt(getChild(p, "hdg", "0"))
-            sPos.AirSpeed = CInt(getChild(p, "aSpeed", "0"))
+            sPos.Airspeed = CInt(getChild(p, "aSpeed", "0"))
             sPos.GroundSpeed = CInt(getChild(p, "gSpeed", "0"))
             sPos.VerticalSpeed = CInt(getChild(p, "vSpeed", "0"))
             sPos.Pitch = ParseNumber(getChild(p, "pitch", "0.00"))
@@ -354,21 +356,24 @@ Public Function RestoreFlightData(ByVal flightCode As String) As SavedFlight
             sPos.phase = getChild(p, "phase", "Airborne")
             sPos.simRate = CInt(getChild(p, "simrate", "256") / 256)
             sPos.Flaps = CInt(getChild(p, "flaps", "0"))
-            sPos.fuel = CLng(getChild(p, "fuel", "0"))
+            sPos.Fuel = CLng(getChild(p, "fuel", "0"))
             sPos.weight = CLng(getChild(p, "weight", "0"))
             sPos.WindHeading = CInt(getChild(p, "wHdg", "0"))
             sPos.WindSpeed = CInt(getChild(p, "wSpeed", "0"))
+            sPos.FrameRate = CInt(getChild(p, "frameRate", "0"))
             sPos.DateTime.UTCTime = ParseDateTime(getChild(p, "date", CStr(Now)))
             
             'Build the flags
             Flags = CLng(getChild(p, "flags", "0"))
-            sPos.Paused = hasFlag(Flags, FLIGHTPAUSED)
-            sPos.Slewing = hasFlag(Flags, FLIGHTSLEWING)
-            sPos.Parked = hasFlag(Flags, FLIGHTPARKED)
-            sPos.onGround = hasFlag(Flags, FLIGHTONGROUND)
+            sPos.Paused = hasFlag(Flags, FLIGHT_PAUSED)
+            sPos.Slewing = hasFlag(Flags, FLIGHT_SLEWING)
+            sPos.Parked = hasFlag(Flags, FLIGHT_PARKED)
+            sPos.onGround = hasFlag(Flags, FLIGHT_ONGROUND)
             sPos.Spoilers = hasFlag(Flags, FLIGHT_SP_ARM)
             sPos.GearDown = hasFlag(Flags, FLIGHT_GEAR_DOWN)
             sPos.AfterBurner = hasFlag(Flags, FLIGHT_AFTERBURNER)
+            sPos.Overspeed = hasFlag(Flags, FLIGHT_OVERSPEED)
+            sPos.Stall = hasFlag(Flags, FLIGHT_STALL)
             sPos.AP_NAV = hasFlag(Flags, FLIGHT_AP_NAV)
             sPos.AP_GPS = hasFlag(Flags, FLIGHT_AP_GPS)
             sPos.AP_HDG = hasFlag(Flags, FLIGHT_AP_HDG)

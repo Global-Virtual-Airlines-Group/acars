@@ -18,6 +18,9 @@ Public PMDG747 As Boolean
 Public LDS767 As Boolean
 Public Payne7X7 As Boolean
 
+Public ZeroFuelWeight As Long
+Public MaxGrossWeight As Long
+
 Public HasAfterburner As Boolean
 Private acAGL As Integer
 
@@ -26,6 +29,18 @@ Private airP As String
 Private airF As String
 
 Public code As String
+Public FuelProfile As String
+
+'Aircraft parameters
+Public FuelWeight As Double
+Public EngineType As Integer
+Public EngineCount As Integer
+
+'FSUIPC Fuel Tank Offsets
+Private TankOfs As Variant
+Private TankCOfs As Variant
+
+Private TankSizes(10) As Long
 
 Public Sub Class_Initialize()
     PMDG737 = False
@@ -66,4 +81,70 @@ End Property
 
 Property Let BaseAGL(ByVal agl As Integer)
     If (acAGL = -1) Then acAGL = agl
+End Property
+
+Property Get tankOffsets() As Variant
+    tankOffsets = TankOfs
+End Property
+
+Property Get TankCOffsets() As Variant
+    TankCOffsets = TankCOfs
+End Property
+
+Public Sub AddTankOffset(ByVal ofs As Long)
+    Dim x As Integer
+    
+    If IsEmpty(TankOfs) Then
+        ReDim TankOfs(0)
+    Else
+        For x = 0 To UBound(TankOfs)
+            If (TankOfs(x) = ofs) Then Exit Sub
+        Next
+    
+        ReDim Preserve TankOfs(UBound(TankOfs) + 1)
+    End If
+        
+    TankOfs(UBound(TankOfs)) = ofs
+End Sub
+
+Public Sub AddTankCapacityOffset(ByVal ofs As Long)
+    Dim x As Integer
+
+    If IsEmpty(TankCOfs) Then
+        ReDim TankCOfs(0)
+    Else
+        For x = 0 To UBound(TankCOfs)
+            If (TankCOfs(x) = ofs) Then Exit Sub
+        Next
+    
+        ReDim Preserve TankCOfs(UBound(TankCOfs) + 1)
+    End If
+        
+    TankCOfs(UBound(TankCOfs)) = ofs
+End Sub
+
+Public Sub SetCapacity(ByVal tank As Integer, ByVal Size As Long)
+    If ((tank >= 0) And (tank < 10)) Then TankSizes(tank) = CLng(Size * FuelWeight)
+End Sub
+
+Public Function TankCapacity(ByVal tank As Integer) As Long
+    If ((tank >= 0) And (tank < 10)) Then TankCapacity = TankSizes(tank)
+End Function
+
+Public Function HasTank(ByVal tank As Integer) As Boolean
+    HasTank = (TankCapacity(tank) > 0)
+End Function
+
+Property Get Tanks() As Variant
+    Dim x As Integer
+    Dim results As Variant
+    
+    For x = 0 To MAX_TANK
+        If (TankCapacity(x) > 0) Then
+            ReDim Preserve results(UBound(results) + 1)
+            results(UBound(results)) = x
+        End If
+    Next
+    
+    Tanks = results
 End Property
