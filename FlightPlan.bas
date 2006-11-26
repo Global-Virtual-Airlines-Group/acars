@@ -1,13 +1,27 @@
-Attribute VB_Name = "SB3Support"
+Attribute VB_Name = "FlightPlans"
 Option Explicit
 
 Private Const SB3Filter = "Squawkbox 3 Flight Plans (*.sfp)|*.sfp"
 Private Const FS9Filter = "FS2004 Flight Plans (*.pln)|*.pln"
+Private Const ACARSFilter = "ACARS Flight Data (ACARS Flight *.sha)|ACARS Flight *.sha"
 
 Public Sub FPlan_Open()
+    Dim oldPath As String
     Dim planFileName As String
     Dim lats As Variant
     Dim lngs As Variant
+    Dim eqType As String
+    
+    'Set critical error handler
+    On Error GoTo FatalError
+    
+    'Get equipment type
+    If (Len(info.EquipmentType) < 4) Then
+        MsgBox "Please select an Aircraft Type before loading a Flight Plan.", vbExclamation, _
+            "No Aircraft Type"
+        frmMain.cboEquipment.SetFocus
+        Exit Sub
+    End If
     
     'Set dialog box options
     With frmMain.CommonDialog1
@@ -17,20 +31,23 @@ Public Sub FPlan_Open()
             .Filter = FS9Filter
         End If
     
+        oldPath = .InitDir
         If (config.SavedFlightsPath <> "") Then .InitDir = config.SavedFlightsPath
         .CancelError = True
         .DialogTitle = "Open Flight Plan"
         .Flags = cdlOFNFileMustExist + cdlOFNHideReadOnly
+        
+        'Display the dialog box
+        On Error Resume Next
+        .ShowOpen
+        .InitDir = oldPath
+        If err Then Exit Sub
+        On Error GoTo 0
+        
+        planFileName = .FileName
     End With
     
-    'Display the dialog box
-    On Error Resume Next
-    frmMain.CommonDialog1.ShowOpen
-    If err Then Exit Sub
-    On Error GoTo 0
-    
-    'Get the file name and save the flights path
-    planFileName = frmMain.CommonDialog1.FileName
+    'Save the flights path
     config.SavedFlightsPath = Left$(planFileName, Len(planFileName) - _
         Len(frmMain.CommonDialog1.FileTitle) - 1)
     
@@ -49,12 +66,14 @@ Public Sub FPlan_Open()
             Dim depData As Variant
             Dim destInfo As String
             Dim tmpRoute As String
+            Dim routeType As Integer
             Dim x As Integer
             
             'Initialize the data arrays
             ReDim lats(25)
             ReDim lngs(25)
             
+            routeType = CInt(ReadINI("flightplan", "routetype", "3", planFileName))
             info.CruiseAltitude = ReadINI("flightplan", "cruising_altitude", info.CruiseAltitude, planFileName)
             depInfo = ReadINI("flightplan", "departure_id", "KATL", planFileName)
             destInfo = ReadINI("flightplan", "destination_id", "KATL", planFileName)
@@ -65,10 +84,20 @@ Public Sub FPlan_Open()
                 depInfo = ReadINI("flightplan", "waypoint." + CStr(x), "X", planFileName)
                 If (depInfo <> "X") Then
                     depData = Split(UCase(depInfo), ",")
-                    tmpRoute = tmpRoute + " " + Trim(depData(3))
-                    If (x < 25) Then
-                        lats(x) = ConvertLatLon(depData(5))
-                        lngs(x) = ConvertLatLon(depData(6))
+                    
+                    'Parse different data
+                    If ((routeType = 3) Or (routeType = 0)) Then
+                        tmpRoute = tmpRoute + " " + Trim(depData(3))
+                        If (x < 25) Then
+                            lats(x) = ConvertLatLon(depData(5))
+                            lngs(x) = ConvertLatLon(depData(6))
+                        End If
+                    Else
+                        tmpRoute = tmpRoute + " " + Trim(depData(0))
+                        If (x < 25) Then
+                            lats(x) = ConvertLatLon(depData(2))
+                            lngs(x) = ConvertLatLon(depData(3))
+                        End If
                     End If
                 End If
                 
@@ -79,9 +108,8 @@ Public Sub FPlan_Open()
             info.Route = UCase(Trim(tmpRoute))
             
             'If we're using a 707/720, offer to write the flight plan
-            Dim eqType As String
             eqType = Left(info.EquipmentType, 4)
-            If ((Left(eqType, 4) = "B707") Or (Left(eqType, 4) = "B720")) Then
+            If ((eqType = "B707") Or (eqType = "B720")) Then
                 If (MsgBox("Do you want to save this as a Boeing 707 INS flight plan?", _
                     vbYesNo + vbQuestion, "707 INS Flight Plan") = vbYes) Then
                         If (x < 25) Then
@@ -98,6 +126,14 @@ Public Sub FPlan_Open()
     End Select
     
     config.UpdateFlightInfo
+    
+ExitSub:
+    Exit Sub
+    
+FatalError:
+    MsgBox "Error #" & CStr(err.Number) & " (" & err.Description & ") loading Flight Plan", vbCritical, "Error"
+    Resume ExitSub
+    
 End Sub
 
 Public Sub SB3Plan_Save()
@@ -256,4 +292,82 @@ Private Sub SaveINSPlan(lats As Variant, lngs As Variant)
     Next
     
     Close #fNum
+End Sub
+
+Public Sub FData_Open()
+    Dim oldPath As String
+    Dim shaFileName As String
+    Dim FlightID As String
+    Dim oldFlight As SavedFlight
+    Dim oldInfo As FlightData
+
+    'Get the file to load
+    With frmMain.CommonDialog1
+        oldPath = .InitDir
+        .InitDir = App.path
+        .Filter = ACARSFilter
+        .CancelError = True
+        .DialogTitle = "Open Flight Data"
+        .Flags = cdlOFNFileMustExist + cdlOFNHideReadOnly
+        
+        'Display the dialog box
+        On Error Resume Next
+        .ShowOpen
+        .InitDir = oldPath
+        If err Then Exit Sub
+        On Error GoTo 0
+        
+        shaFileName = .FileName
+        FlightID = Left(.FileTitle, InStr(.FileTitle, ".") - 1)
+        FlightID = Right(FlightID, Len(FlightID) - 13)
+    End With
+    
+    'Load the flight
+    Set oldFlight = RestoreFlightData(FlightID)
+    If (oldFlight Is Nothing) Then
+        MsgBox "Cannot Restore Flight " & FlightID & "!", vbExclamation Or vbOKOnly, "Cannot Load Data"
+        Exit Sub
+    End If
+    
+    'Get the flight data
+    If config.ShowDebug Then ShowMessage "Loaded Flight " + FlightID, DEBUGTEXTCOLOR
+    Set oldInfo = oldFlight.FlightInfo
+    If Not oldInfo.FlightData Then
+        MsgBox "Flight " & FlightID & " is not complete, and cannot be loaded.", vbExclamation Or _
+            vbOKOnly, "Flight Not Completed"
+        Exit Sub
+    ElseIf oldInfo.TestFlight Then
+        MsgBox "Flight " & FlightID & " was a Test Flight, and cannot be loaded.", vbExclamation Or _
+            vbOKOnly, "Test Flight"
+        Exit Sub
+    End If
+    
+    'Load the position cache
+    Dim x As Integer
+    Dim pd As PositionData
+    For x = 0 To UBound(oldFlight.Positions)
+        Set pd = oldFlight.Positions(x)
+        Positions.AddPosition pd
+    Next
+    
+    If config.ShowDebug Then ShowMessage "Restored " + CStr(x) + " position cache entries", DEBUGTEXTCOLOR
+        
+    'Reset button states
+    Set info = oldInfo
+    config.UpdateFlightInfo
+    With frmMain
+        .LockFlightInfo False
+        .chkCheckRide.Enabled = Not info.TestFlight
+        .chkTrainFlight.Enabled = Not info.CheckRide
+        .tmrPosUpdates.Enabled = info.InFlight
+        .tmrFlightTime.Enabled = info.InFlight
+        .tmrStartCheck.Enabled = False
+        .cmdPIREP.visible = True
+        .cmdPIREP.Enabled = info.FlightData And config.ACARSConnected
+        If info.CheckRide Then .chkCheckRide.value = 1
+    End With
+    
+    'Display status message
+    MsgBox "ACARS has loaded your old Flight Data, and has enough information" & vbCrLf & _
+        "to file a Flight Report.", vbOKOnly Or vbInformation, "Flight Restored"
 End Sub

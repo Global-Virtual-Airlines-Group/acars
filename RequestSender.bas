@@ -76,7 +76,7 @@ Public Function SendFlightInfo(fInfo As FlightData) As Long
     ReqStack.Queue cmd
     SendFlightInfo = ReqStack.RequestID
     
-    If config.ShowDebug Then ShowMessage "Sent flight info", DEBUGTEXTCOLOR
+    If config.ShowDebug Then ShowMessage "Sent flight info " & Hex(SendFlightInfo), DEBUGTEXTCOLOR
 End Function
 
 Public Sub RequestPilotInfo(PilotID As String)
@@ -218,7 +218,7 @@ Public Sub SendChat(msgText As String, Optional msgTo As String)
     
         AddXMLField cmd, "to", p.ID
         If config.ShowPilotNames Then
-            msgFrom = msgFrom + "->" + p.name
+            msgFrom = msgFrom + "->" + p.Name
         Else
             msgFrom = msgFrom + "->" + p.ID
         End If
@@ -238,7 +238,7 @@ Public Function SendCredentials(userID As String, pwd As String) As Long
     
     'Log stealth mode
     isStealth = (frmMain.chkStealth.value = 1) And config.HasRole("HR")
-    If isStealth Then ShowMessage "Hidden/Stealth Connection", DEBUGTEXTCOLOR
+    If isStealth And config.ShowDebug Then ShowMessage "Hidden/Stealth Connection", DEBUGTEXTCOLOR
 
     'Build the request
     Set cmd = buildCMD("auth")
@@ -248,10 +248,11 @@ Public Function SendCredentials(userID As String, pwd As String) As Long
     AddXMLField cmd, "password", pwd, True
     AddXMLField cmd, "build", CStr(App.Revision), False
     AddXMLField cmd, "stealth", CStr(isStealth), False
+    AddXMLField cmd, "version", "v" & CStr(App.Major) & "." & CStr(App.Minor), False
     ReqStack.Queue cmd
+    SendCredentials = ReqStack.RequestID
 
     If config.ShowDebug Then ShowMessage "Logging In", DEBUGTEXTCOLOR
-    SendCredentials = ReqStack.RequestID
 End Function
 
 Public Sub SendPing()
@@ -267,7 +268,7 @@ Public Function SendEndFlight() As Long
 
     'Build the request and send it
     ReqStack.Queue buildCMD("end_flight")
-    If config.ShowDebug Then ShowMessage "Sent end_flight message", DEBUGTEXTCOLOR
+    If config.ShowDebug Then ShowMessage "Sent EndFlight " & Hex(ReqStack.RequestID), DEBUGTEXTCOLOR
     SendEndFlight = ReqStack.RequestID
 End Function
 
@@ -359,8 +360,16 @@ Public Function SendPosition(ByVal cPos As PositionData, ByVal IsLogged As Boole
 
     'Send the request
     ReqStack.Queue cmd
-    If config.ShowDebug Then ShowMessage "Sent position update", DEBUGTEXTCOLOR
     SendPosition = ReqStack.RequestID
+    
+    'Log the request
+    If config.ShowDebug Then
+        If noFlood Then
+            ShowMessage "Sent bulk position update " & Hex(SendPosition), DEBUGTEXTCOLOR
+        Else
+            ShowMessage "Sent position update " & Hex(SendPosition), DEBUGTEXTCOLOR
+        End If
+    End If
 End Function
 
 Public Function SendPIREP(info As FlightData) As Long
@@ -404,6 +413,6 @@ Public Function SendPIREP(info As FlightData) As Long
 
     'Send the request
     ReqStack.Queue cmd
-    If config.ShowDebug Then ShowMessage "Sent Flight Report", DEBUGTEXTCOLOR
     SendPIREP = ReqStack.RequestID
+    If config.ShowDebug Then ShowMessage "Sent Flight Report " & Hex(SendPIREP), DEBUGTEXTCOLOR
 End Function

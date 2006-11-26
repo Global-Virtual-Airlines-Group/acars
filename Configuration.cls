@@ -254,6 +254,8 @@ Public Sub UpdateSettingsMenu()
 End Sub
 
 Public Sub UpdateFlightInfo()
+    Dim x As Integer
+
     If (info.FlightNumber > 0) Then frmMain.txtFlightNumber.Text = CStr(info.FlightNumber)
     frmMain.txtCruiseAlt.Text = info.CruiseAltitude
     frmMain.txtRemarks.Text = info.Remarks
@@ -264,6 +266,16 @@ Public Sub UpdateFlightInfo()
     frmMain.cboAirportL.ListIndex = GetAirportOfs(info.AirportL) + 1
     If info.CheckRide Then frmMain.chkCheckRide.value = 1
     If info.TestFlight Then frmMain.chkTrainFlight.value = 1
+    
+    'Set equipment type
+    With frmMain.cboEquipment
+        For x = 0 To (.ListCount - 1)
+            If (.List(x) = info.EquipmentType) Then
+                .ListIndex = x
+                Exit For
+            End If
+        Next
+    End With
 End Sub
 
 Public Sub Save()

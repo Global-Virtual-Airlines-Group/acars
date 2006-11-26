@@ -29,8 +29,8 @@ Public Const XML_IN_COLOR = &HAAAAAA
 Public Const XML_OUT_COLOR = &HCACACA
 
 'Minimum FSUIPC version constants
-Private Const MIN_FSUIPC_CODE = &H36010000
-Private Const MIN_FSUIPC_VERSION = "3.601"
+Private Const MIN_FSUIPC_CODE = &H36000000
+Private Const MIN_FSUIPC_VERSION = "3.600"
 
 'Miscellaneous constants
 Public Const MAXTIMECOMPRESSION = 4
@@ -53,7 +53,7 @@ Sub Main()
         MsgBox App.ProductName + " is already running!", vbOKOnly Or vbExclamation, "Error"
         End
     End If
-
+    
     'Load the splash screen
     frmSplash.Show vbModeless
     frmSplash.Icon = LoadResPicture(101, vbResIcon)
@@ -83,7 +83,6 @@ Public Sub ApplicationStartup()
     config.LoadAirports
     config.LoadEquipment
     config.LoadAirlines
-    frmMain.SSTab1.TabVisible(3) = config.ShowDebug
     
     'Set startup message
     ShowMessage App.Title & " version " & App.Major & "." & App.Minor & " (Build " & _
@@ -181,7 +180,7 @@ Public Sub ApplicationStartup()
                 Do
                     Sleep 250
                     totalWait = totalWait + 250
-                Loop Until ((totalWait > 29500) Or IsFSReady)
+                Loop Until ((totalWait > 45000) Or IsFSReady)
             
                 'If we're not ready, then kill things
                 If Not IsFSReady Then
@@ -198,27 +197,27 @@ Public Sub ApplicationStartup()
                         "Excel and Google Earth.", vbOKOnly + vbInformation, "Flight Restored"
                 Else
                     MsgBox "ACARS has loaded your old Flight Data, and has enough information to file" & _
-                        vbCrLf & "a Flight Report. Please connect to the ACARS server to file your PIREP.", _
-                    vbOKOnly + vbInformation, "Flight Restored"
+                      vbCrLf & "a Flight Report. Please connect to the ACARS server to file your PIREP.", _
+                      vbOKOnly + vbInformation, "Flight Restored"
                 End If
             End If
             
             'Reset button states
             With frmMain
                 .LockFlightInfo False
-                .chkCheckRide.enabled = Not info.TestFlight
-                .chkTrainFlight.enabled = Not info.CheckRide
-                .tmrPosUpdates.enabled = info.InFlight
-                .tmrFlightTime.enabled = info.InFlight
-                .tmrStartCheck.enabled = False
+                .chkCheckRide.Enabled = Not info.TestFlight
+                .chkTrainFlight.Enabled = Not info.CheckRide
+                .tmrPosUpdates.Enabled = info.InFlight
+                .tmrFlightTime.Enabled = info.InFlight
+                .tmrStartCheck.Enabled = False
                 .cmdPIREP.visible = True
                 If info.TestFlight Then
-                    .cmdPIREP.enabled = info.FlightData
+                    .cmdPIREP.Enabled = info.FlightData
                     .cmdPIREP.Caption = "Export Data"
                     .chkTrainFlight.value = 1
-                    .chkTrainFlight.enabled = False
+                    .chkTrainFlight.Enabled = False
                 Else
-                    .cmdPIREP.enabled = info.FlightData And config.ACARSConnected
+                    .cmdPIREP.Enabled = info.FlightData And config.ACARSConnected
                     If info.CheckRide Then .chkCheckRide.value = 1
                 End If
             End With
@@ -235,7 +234,7 @@ Public Sub ApplicationStartup()
     'Update settings
     frmSplash.SetProgressLabel "Loading airport/equipment options"
     SetComboChoices frmMain.cboEquipment, config.EquipmentTypes, info.EquipmentType, "-"
-    SetComboChoices frmMain.cboAirline, config.AirlineNames, config.GetAirline(LoadResString(101)).name, "-"
+    SetComboChoices frmMain.cboAirline, config.AirlineNames, info.Airline.Name, "-"
     SetAirport frmMain.cboAirportD, config.AirportNames, info.airportD
     SetAirport frmMain.cboAirportA, config.AirportNames, info.AirportA
     SetAirport frmMain.cboAirportL, config.AirportNames, info.AirportL
@@ -246,7 +245,11 @@ Public Sub ApplicationStartup()
     If IsFSRunning And Not config.FSUIPCConnected Then
         frmSplash.SetProgressLabel "Connecting to FSUIPC"
         FSUIPC_Connect
+        If config.FSUIPCConnected Then Set acInfo = GetAircraftInfo()
     End If
+    
+    'Update gauge status
+    GAUGE_SetPhase info.FlightPhase, config.ACARSConnected
     
     'Set enabled state of buttons
     SetButtonMenuStates
@@ -265,13 +268,19 @@ Public Sub ApplicationStartup()
         End If
     End With
     
+    'If we do not have a flight but FS is running, go into Cold & Dark mode
+    If (oldFlight Is Nothing) And config.FSUIPCConnected And config.ColdDark Then
+        frmSplash.SetProgressLabel "Setting Cold and Dark Cockpit"
+        ColdDarkCockpit True
+    End If
+    
     'Pause for 2 seconds
     frmSplash.ClearProgressLabel
     If (oldFlight Is Nothing) Then
-        While ((totalWait < 1250) And Not frmSplash.isClicked)
-            totalWait = totalWait + 100
+        While ((totalWait < 2250) And Not frmSplash.isClicked)
+            totalWait = totalWait + 150
             DoEvents
-            Sleep 100
+            Sleep 150
         Wend
     End If
     
@@ -280,7 +289,10 @@ Public Sub ApplicationStartup()
         .Show
         .txtCmd.SetFocus
         .MousePointer = vbDefault
-        If config.FSUIPCConnected Then .tmrStartCheck.enabled = True
+        .SSTab1.TabVisible(3) = config.ShowDebug
+        .chkStealth.Enabled = config.HasRole("HR")
+        .chkStealth.visible = config.HasRole("HR")
+        If config.FSUIPCConnected Then .tmrStartCheck.Enabled = True
     End With
 End Sub
 
@@ -288,11 +300,11 @@ Public Function ConfirmExit() As Boolean
     ConfirmExit = True
     If info.FlightData And Not info.PIREPFiled Then
         If info.TestFlight Then
-            ConfirmExit = (MsgBox("You have not filed a Flight Report for your flight. " & _
-                "Are you sure you want to exit?", vbYesNo Or vbQuestion, "Confirm") = vbYes)
-        Else
             ConfirmExit = (MsgBox("You have not saved your flight data from this Training Flight. " & _
                 "Are you sure you want to exit?", vbYesNo Or vbQuestion, "Confirm Exit") = vbYes)
+        Else
+            ConfirmExit = (MsgBox("You have not filed a Flight Report for your flight. " & _
+                "Are you sure you want to exit?", vbYesNo Or vbQuestion, "Confirm") = vbYes)
         End If
         
         If Not ConfirmExit Then Exit Function
@@ -310,9 +322,11 @@ Public Function ConfirmExit() As Boolean
 End Function
 
 Public Function FSUIPC_Connect(Optional showError As Boolean = False) As Integer
+    Dim WideFS_Version As Long
     Dim dwResult As Long
 
     config.FSUIPCConnected = False
+    config.WideFSConnected = False
     
     'Make sure FS is running
     If Not IsFSRunning Then
@@ -322,7 +336,7 @@ Public Function FSUIPC_Connect(Optional showError As Boolean = False) As Integer
         Exit Function
     End If
 
-    'Initialize important vars for UIPC comms - call only once!
+    'Initialize important vars for UIPC comms
     FSUIPC_Initialization
 
     'Try to connect to FSUIPC (or WideFS)
@@ -337,10 +351,10 @@ Public Function FSUIPC_Connect(Optional showError As Boolean = False) As Integer
     Dim FSVer As Integer
     Call FSUIPC_Read(&H3308, 2, VarPtr(FSVer), dwResult)
     Call FSUIPC_Read(&H330C, 2, VarPtr(Flags), dwResult)
+    Call FSUIPC_Read(&H3322, 2, VarPtr(WideFS_Version), dwResult)
     If Not FSUIPC_Process(dwResult) Then
         MsgBox "Error reading FSUIPC Registration!", vbOKOnly Or vbCritical, "FSUIPC Error"
         FSUIPC_Close
-        config.FSUIPCConnected = False
         FSUIPC_Connect = 16
         Exit Function
     End If
@@ -361,7 +375,13 @@ Public Function FSUIPC_Connect(Optional showError As Boolean = False) As Integer
         FSUIPC_Connect = 16
         Exit Function
     End If
-        
+    
+    'Display WideFS
+    If (WideFS_Version > 0) Then
+        config.WideFSConnected = True
+        If config.ShowDebug Then ShowMessage "WideClient detected", DEBUGTEXTCOLOR
+    End If
+    
     'Check that we're using a supported FSUIPC version
     If (FSUIPC_Version < MIN_FSUIPC_CODE) Then
         MsgBox App.ProductName & " requires FSUIPC v" & MIN_FSUIPC_VERSION & " or newer.", _
@@ -370,10 +390,13 @@ Public Function FSUIPC_Connect(Optional showError As Boolean = False) As Integer
         FSUIPC_Connect = 16
         Exit Function
     End If
+    
+    'Write ACARS status
+    GAUGE_SetStatus ACARS_ON
         
     'Get FS Versions
     Dim FSNames As Variant
-    FSNames = Array("?", "FS98", "FS2000", "CFS2", "CFS1", "?", "FS2002", "FS2004")
+    FSNames = Array("?", "FS98", "FS2000", "CFS2", "CFS1", "?", "FS2002", "FS2004", "FSX")
         
     'Log FS Version
     If (FSVer > UBound(FSNames)) Then FSVer = UBound(FSNames)
@@ -390,7 +413,6 @@ Public Sub FSError(ByVal errCode As Integer)
 
     'Close the FSUIPC connection
     FSUIPC_Close
-    config.FSUIPCConnected = False
     
     'If we're not flying then don't sweat it
     If Not info.InFlight Then Exit Sub
@@ -416,7 +438,7 @@ Public Sub FSError(ByVal errCode As Integer)
 End Sub
 
 Public Sub SetButtonMenuStates()
-    frmMain.mnuOpenFlightPlan.enabled = Not info.InFlight
+    frmMain.mnuOpenFlightPlan.Enabled = Not info.InFlight
     If info.InFlight Then
         frmMain.cmdStartStopFlight.Caption = "End Flight"
     ElseIf (info.FlightPhase = ERROR) Then
@@ -501,7 +523,7 @@ Public Sub SetAirport(combo As ComboBox, choices As Variant, ap As Airport)
     If (ap Is Nothing) Then
         SetComboChoices combo, choices, "-", "-"
     Else
-        SetComboChoices combo, choices, ap.name + " (" + ap.ICAO + ")", "-"
+        SetComboChoices combo, choices, ap.Name + " (" + ap.ICAO + ")", "-"
     End If
 End Sub
 
@@ -531,11 +553,11 @@ Public Sub SetComboChoices(combo As ComboBox, choices As Variant, Optional newVa
     If (combo.ListIndex = -1) Then combo.ListIndex = 0
 End Sub
 
-Public Sub PlaySoundFile(name As String)
+Public Sub PlaySoundFile(Name As String)
     Dim fName As String
     
     'Check that the file exists
-    fName = App.path + "\" + name
+    fName = App.path + "\" + Name
     If (Dir(fName) <> "") Then
         PlaySound fName, 0, SND_ASYNC And SND_FILENAME
     Else
@@ -547,3 +569,26 @@ Public Sub PlaySoundAlias(ByVal alias As String)
     PlaySound alias, 0, SND_ASYNC And SND_ALIAS
 End Sub
 
+Public Sub LimitLength(txt As TextBox, ByVal maxLen As Integer, Optional doUpperCase As Boolean = False)
+    If (Len(txt.Text) > maxLen) Then txt.Text = Left(txt.Text, maxLen)
+    If (doUpperCase And (UCase(txt.Text) <> txt.Text)) Then
+        txt.Text = UCase(txt.Text)
+        txt.SelStart = Len(txt.Text)
+    End If
+End Sub
+
+Public Sub LimitNumber(txt As TextBox, ByVal maxValue As Long)
+    Dim x As Long
+    Dim tst As String
+    Dim c As String
+    
+    For x = 1 To Len(txt.Text)
+        c = Mid(txt.Text, x, 1)
+        If IsNumeric(c) Or (c = "-") Then tst = tst + c
+    Next
+    
+    x = 0
+    If ((tst <> "") And (tst <> "-")) Then x = CLng(tst)
+    If (x > maxValue) Then x = maxValue
+    txt.Text = CStr(x)
+End Sub

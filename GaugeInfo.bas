@@ -99,15 +99,3 @@ Public Sub GAUGE_ClearChat()
     'Log debug message
     If config.ShowDebug Then ShowMessage "Cleared Gauge chat message indicator", DEBUGGAUCOLOR
 End Sub
-
-Public Function GAUGE_GetPhase() As Integer
-    Dim FlightPhase As Integer
-    Dim lngResult As Long
-    
-    'Do nothing if gauge support disabled
-    If Not config.GaugeSupport Or Not config.FSUIPCConnected Then Exit Function
-    
-    Call FSUIPC_Read(GAUGE_BASE, 1, VarPtr(FlightPhase), lngResult)
-    Call FSUIPC_Process(lngResult)
-    GAUGE_GetPhase = FlightPhase
-End Function

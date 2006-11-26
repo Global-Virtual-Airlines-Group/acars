@@ -23,9 +23,16 @@ Private Function convertNAVCOM(ByVal freq As String) As Integer
     freqParts = Split(freq, ".")
     freqTop = CInt(freqParts(0)) - 100
     If (Len(freqParts(1)) = 1) Then freqParts(1) = freqParts(1) + "0"
-    freqBottom = CInt(freqParts(1))
+    
+    'Convert the frequency
+    If (Len(freqParts(1)) = 1) Then
+        freqParts(1) = freqParts(1) + "0"
+    ElseIf (Len(freqParts(1)) > 2) Then
+        freqParts(1) = Left(freqParts(1), 2)
+    End If
     
     'Convert the fractional part to hex BCD
+    freqBottom = CInt(freqParts(1))
     retVal = ((freqBottom \ 10) * 16) + (freqBottom Mod 10)
     
     'Convert the integer part to hex BCD
@@ -37,8 +44,8 @@ ExitSub:
     
 FatalError:
     ShowMessage "Error processing Frequency " + freq, ACARSERRORCOLOR
+    convertNAVCOM = -1
     Resume ExitSub
-    
 End Function
 
 Private Function convertADF(ByVal freq As String) As Long
@@ -46,6 +53,8 @@ Private Function convertADF(ByVal freq As String) As Long
     Dim freqTop As Integer
     Dim retTop As Integer
     Dim retBottom As Integer
+    
+    On Error GoTo FatalError
     
     'Check for empty string
     If (freq = "") Then
@@ -61,6 +70,27 @@ Private Function convertADF(ByVal freq As String) As Long
     retBottom = (((freqTop Mod 1000) \ 100) * 256) + (freqTop Mod 10)
     retBottom = retBottom + (((freqTop Mod 100) \ 10) * 16)
     convertADF = (retTop * 65536) + retBottom
+    
+ExitSub:
+    Exit Function
+    
+FatalError:
+    ShowMessage "Error processing Frequency " + freq, ACARSERRORCOLOR
+    convertADF = -1
+    Resume ExitSub
+End Function
+
+Private Function convertTX(ByVal freq As String) As Long
+    Dim freqTop As Integer
+
+    'Check for empty string
+    If (freq = "") Then
+        convertTX = -1
+        Exit Function
+    End If
+    
+    'Convert to BCD
+    convertTX = Val("&H" + freq)
 End Function
 
 Public Sub SetNAV1(freqStr As String, hdg As Integer)
@@ -146,7 +176,7 @@ Public Sub SetADF1(ByVal freqStr As String)
     fTop = (freq \ 65536)
     fBottom = CInt(freq Mod 65536)
     
-    ' Write to FSUIPC
+    'Write to FSUIPC
     Call FSUIPC_Write(&H34C, 2, VarPtr(fBottom), lngResult)
     Call FSUIPC_Write(&H356, 2, VarPtr(fTop), lngResult)
     Call FSUIPC_Write(&H389, 1, VarPtr(navRadioReset), lngResult)
@@ -154,5 +184,22 @@ Public Sub SetADF1(ByVal freqStr As String)
         ShowMessage "Error setting ADF1", ACARSERRORCOLOR
     Else
         ShowMessage "ADF1 Radio set to " & freqStr, ACARSTEXTCOLOR
+    End If
+End Sub
+
+Public Sub SetTX(ByVal freqStr As String)
+    Dim freq As Long
+    Dim lngResult As Long
+    
+    'Write the frequency
+    freq = convertTX(freqStr)
+    If (freq = -1) Then Exit Sub
+
+    'Write to FSUIPC
+    Call FSUIPC_Write(&H354, 2, VarPtr(freq), lngResult)
+    If Not FSUIPC_Process(lngResult) Then
+        ShowMessage "Error setting Transponder Code", ACARSERRORCOLOR
+    Else
+        ShowMessage "Transponder set to " & freqStr, ACARSTEXTCOLOR
     End If
 End Sub

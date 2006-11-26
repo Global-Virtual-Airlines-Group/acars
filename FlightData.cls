@@ -128,7 +128,7 @@ Property Get flightCode() As String
 End Property
 
 'Updates flight time
-Function UpdateFlightTime(ByVal simRate As Integer, ByVal interval As Integer) As Date
+Function UpdateFlightTime(ByVal simRate As Integer, ByVal interval As Long) As Date
     Dim tmpS As Integer
 
     interval = interval * simRate

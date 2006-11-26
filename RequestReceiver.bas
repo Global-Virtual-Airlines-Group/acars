@@ -9,11 +9,14 @@ Public Function WaitForACK(ByVal ID As Long, Optional ByVal TimeOut As Long = 25
     Dim totalTime As Long
     
     ACKStack.Queue ID
+    
+    'If we're waiting to send something, then send it
+    If ReqStack.HasData Then ReqStack.Send
     While (totalTime < TimeOut) And Not gotACK
         gotACK = ACKStack.HasReceived(ID)
         If Not gotACK Then
-            totalTime = totalTime + 100
-            Sleep 100
+            totalTime = totalTime + 150
+            Sleep 150
             DoEvents
         End If
     Wend
@@ -194,7 +197,7 @@ Private Sub ProcessACK(cmdNode As IXMLDOMNode)
         RequestPilotList
         
         'Get a flight ID if we have a flight
-        If (info.InFlight Or info.FlightData) And Not info.TestFlight Then info.InfoReqID = SendFlightInfo(info)
+        If (info.InFlight Or info.FlightData) And Not (info.TestFlight Or RequestInfo) Then info.InfoReqID = SendFlightInfo(info)
         
         'Send data
         ReqStack.Send
