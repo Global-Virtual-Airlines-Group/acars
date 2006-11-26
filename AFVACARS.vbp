@@ -20,7 +20,7 @@ Class=Charts; Charts.cls
 Module=modMain; modMain.bas
 Module=modFDR; modFDR.bas
 Module=modRegistry; modRegistry.bas
-Module=SB3Support; FlightPlan.bas
+Module=FlightPlans; FlightPlan.bas
 Module=RequestReceiver; RequestReceiver.bas
 Module=RequestSender; RequestSender.bas
 Form=frmAFVSplash.frm
@@ -69,7 +69,7 @@ Description="ACARS client for Aviation Français Virtuel pilots"
 CompatibleMode="0"
 MajorVer=1
 MinorVer=9
-RevisionVer=72
+RevisionVer=74
 AutoIncrementVer=0
 ServerSupportFiles=0
 VersionComments="FSUIPC Key = GOADBQ1EVSHR"

@@ -38,6 +38,8 @@ Global Const HKEY_CLASSES_ROOT = &H80000000
 Global Const HKEY_CURRENT_USER = &H80000001
 Global Const HKEY_LOCAL_MACHINE = &H80000002
 Global Const HKEY_USERS = &H80000003
+Global Const HKCU = HKEY_CURRENT_USER
+Global Const HKLM = HKEY_LOCAL_MACHINE
 
 Public Const REG_SZ = 1
 Public Const REG_BINARY = 3
@@ -113,7 +115,7 @@ Public Sub RegWriteString(hKey As Long, strPath As String, strValue As String, s
     lRegResult = RegCloseKey(hCurKey)
 End Sub
 
-Public Function RegReadBoolean(ByVal hKey As Long, ByVal strPath As String, ByVal strValue As String, Optional Default As Boolean) As Boolean
+Public Function RegReadBoolean(ByVal hKey As Long, ByVal strPath As String, ByVal strValue As String, Optional Default As Boolean = False) As Boolean
     Dim defaultLong As Long
 
     If Default Then
@@ -184,7 +186,7 @@ Public Sub RegWriteDWORD(ByVal hKey As Long, ByVal strPath As String, ByVal strV
     lRegResult = RegCloseKey(hCurKey)
 End Sub
 
-Function ReadINI(sSection As String, sKey As String, sDefault As String, sIniFile As String)
+Function ReadINI(ByVal sSection As String, ByVal sKey As String, ByVal sDefault As String, ByVal sIniFile As String)
     Dim sBuffer As String, lRet As Long
     ' Fill String with 255 spaces
     sBuffer = String$(255, 0)
@@ -195,8 +197,15 @@ Function ReadINI(sSection As String, sKey As String, sDefault As String, sIniFil
         ' DLL failed, save default
         If sDefault <> "" Then WriteINI sSection, sKey, sDefault, sIniFile
         ReadINI = sDefault
-    Else
-        ReadINI = Left(sBuffer, InStr(sBuffer, Chr(0)) - 1)
+        Exit Function
+    End If
+    
+    'Load the value, and then find first whitespace
+    ReadINI = Left(sBuffer, InStr(sBuffer, Chr(0)) - 1)
+    If (InStr(ReadINI, ";") > 0) Then
+        ReadINI = Left(ReadINI, InStr(ReadINI, ";") - 1)
+    ElseIf (InStr(ReadINI, "//") > 0) Then
+        ReadINI = Left(ReadINI, InStr(ReadINI, "//") - 1)
     End If
 End Function
 
@@ -207,4 +216,41 @@ Function WriteINI(sSection As String, sKey As String, sValue As String, sIniFile
     ' Call DLL
     lRet = WritePrivateProfileString(sSection, sKey, sValue, sIniFile)
     WriteINI = (lRet)
+End Function
+
+Function GetINISections(ByVal sIniFile As String) As Variant
+    Dim fNum As Integer
+    Dim rawData As Variant
+    Dim entry As Variant
+    Dim results As Variant
+    
+    'Set critical error handler
+    On Error GoTo FatalError
+    
+    'Get free file
+    fNum = FreeFile()
+    Open sIniFile For Input Lock Write As #fNum
+    rawData = Split(Input(LOF(fNum), fNum), vbCrLf)
+    Close #fNum
+    
+    'Get the sections
+    For Each entry In rawData
+        If ((Left(entry, 1) = "[") And (Right(entry, 1) = "]")) Then
+            If IsEmpty(results) Then
+                ReDim results(0)
+            Else
+                ReDim Preserve results(UBound(results) + 1)
+            End If
+            
+            results(UBound(results)) = Mid(entry, 2, Len(entry) - 2)
+        End If
+    Next
+    
+ExitSub:
+    GetINISections = results
+    Exit Function
+    
+FatalError:
+    Resume ExitSub
+    
 End Function

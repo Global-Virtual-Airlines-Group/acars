@@ -49,7 +49,7 @@ Begin VB.Form frmAbout
       EndProperty
       Height          =   1005
       Left            =   149
-      Picture         =   "frmAbout.frx":0144
+      Picture         =   "frmAbout.frx":0170
       ScaleHeight     =   63
       ScaleMode       =   3  'Pixel
       ScaleWidth      =   38

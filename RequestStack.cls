@@ -16,7 +16,7 @@ Option Explicit
 Const ACARSVERSION = 1
 Public HasData As Boolean
 
-Private doc As New DOMDocument
+Private doc As DOMDocument
 Private root As IXMLDOMElement
 
 Private RootDate As Date
@@ -28,7 +28,7 @@ Public Sub Class_Initialize()
     Reset
 End Sub
 
-Private Sub Reset()
+Public Sub Reset()
     Dim tmpID As Long
     Dim pi As IXMLDOMProcessingInstruction
     

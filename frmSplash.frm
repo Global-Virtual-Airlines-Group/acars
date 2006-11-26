@@ -1,7 +1,7 @@
 VERSION 5.00
 Begin VB.Form frmSplash 
    Appearance      =   0  'Flat
-   BackColor       =   &H80000005&
+   BackColor       =   &H00808080&
    BorderStyle     =   0  'None
    Caption         =   "Splash Screen"
    ClientHeight    =   6750
@@ -23,7 +23,6 @@ Begin VB.Form frmSplash
    MaxButton       =   0   'False
    MinButton       =   0   'False
    NegotiateMenus  =   0   'False
-   Picture         =   "frmSplash.frx":08CA
    ScaleHeight     =   6750
    ScaleWidth      =   9000
    ShowInTaskbar   =   0   'False
@@ -55,7 +54,7 @@ Begin VB.Form frmSplash
       Height          =   255
       Left            =   2880
       TabIndex        =   0
-      Top             =   6360
+      Top             =   6440
       Width           =   5985
    End
 End
@@ -77,8 +76,21 @@ Private Sub Form_KeyPress(KeyAscii As Integer)
 End Sub
 
 Private Sub Form_Load()
+    Dim SplashImg As StdPicture
+
     VersionLabel.Caption = "Version " + CStr(App.Major) + "." + CStr(App.Minor) + _
         " (Build " + Format(App.Revision, "000") + ")"
+        
+    'Load the background image
+    Set SplashImg = LoadResPicture(101, vbResBitmap)
+    Width = ScaleX(SplashImg.Width, vbHimetric, vbTwips)
+    Height = ScaleY(SplashImg.Height, vbHimetric, vbTwips)
+    Set Picture = SplashImg
+    
+    'Adjust the labels
+    lblProgress.Top = Height - 270
+    VersionLabel.Top = Height - 310
+    VersionLabel.Left = Width - 6120
 End Sub
 
 Public Sub SetProgressLabel(ProgressInfo As String)

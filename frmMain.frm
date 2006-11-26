@@ -28,12 +28,6 @@ Begin VB.Form frmMain
    StartUpPosition =   3  'Windows Default
    Visible         =   0   'False
    WhatsThisHelp   =   -1  'True
-   Begin VB.Timer tmrFilePIREP 
-      Enabled         =   0   'False
-      Interval        =   500
-      Left            =   8160
-      Top             =   2280
-   End
    Begin VB.Timer tmrFailures 
       Enabled         =   0   'False
       Interval        =   60000
@@ -209,24 +203,30 @@ Begin VB.Form frmMain
       TabCaption(1)   =   "Connected Pilots"
       TabPicture(1)   =   "frmMain.frx":0028
       Tab(1).ControlEnabled=   0   'False
-      Tab(1).Control(0)=   "lstPilots"
-      Tab(1).Control(1)=   "cmdBusy"
+      Tab(1).Control(0)=   "infoFrame"
+      Tab(1).Control(0).Enabled=   0   'False
+      Tab(1).Control(1)=   "cmdUpdatePilotList"
       Tab(1).Control(1).Enabled=   0   'False
-      Tab(1).Control(2)=   "cmdUpdatePilotList"
+      Tab(1).Control(2)=   "cmdBusy"
       Tab(1).Control(2).Enabled=   0   'False
-      Tab(1).Control(3)=   "infoFrame"
+      Tab(1).Control(3)=   "lstPilots"
+      Tab(1).Control(3).Enabled=   0   'False
       Tab(1).ControlCount=   4
       TabCaption(2)   =   "Air Traffic Control"
       TabPicture(2)   =   "frmMain.frx":0044
       Tab(2).ControlEnabled=   0   'False
       Tab(2).Control(0)=   "lstATC"
+      Tab(2).Control(0).Enabled=   0   'False
       Tab(2).Control(1)=   "ctrFrame"
+      Tab(2).Control(1).Enabled=   0   'False
       Tab(2).Control(2)=   "radioFrame"
+      Tab(2).Control(2).Enabled=   0   'False
       Tab(2).ControlCount=   3
       TabCaption(3)   =   "XML Message Data"
       TabPicture(3)   =   "frmMain.frx":0060
       Tab(3).ControlEnabled=   0   'False
       Tab(3).Control(0)=   "rtfDebug"
+      Tab(3).Control(0).Enabled=   0   'False
       Tab(3).ControlCount=   1
       Begin VB.ListBox lstPilots 
          ForeColor       =   &H00800000&
@@ -256,6 +256,7 @@ Begin VB.Form frmMain
          _ExtentY        =   5530
          _Version        =   393217
          BorderStyle     =   0
+         Enabled         =   -1  'True
          ReadOnly        =   -1  'True
          ScrollBars      =   2
          TextRTF         =   $"frmMain.frx":007C
@@ -801,6 +802,7 @@ Begin VB.Form frmMain
          _ExtentY        =   4948
          _Version        =   393217
          BorderStyle     =   0
+         Enabled         =   -1  'True
          ReadOnly        =   -1  'True
          ScrollBars      =   2
          OLEDragMode     =   0
@@ -1175,6 +1177,9 @@ Begin VB.Form frmMain
       Begin VB.Menu mnuConnect 
          Caption         =   "&Connect"
       End
+      Begin VB.Menu mnuLoadACARSData 
+         Caption         =   "&Load Saved ACARS Data"
+      End
       Begin VB.Menu mnuFlightSep2 
          Caption         =   "-"
       End
@@ -1189,7 +1194,7 @@ Begin VB.Form frmMain
          Caption         =   "-"
       End
       Begin VB.Menu mnuFlightFuelLoad 
-         Caption         =   "&Load Fuel Tanks"
+         Caption         =   "Load &Fuel Tanks"
       End
       Begin VB.Menu mnuClearChatText 
          Caption         =   "Clear Chat Text"
@@ -1222,7 +1227,7 @@ Begin VB.Form frmMain
    Begin VB.Menu mnuOptions 
       Caption         =   "&Options"
       Begin VB.Menu mnuOptionsFlyOffline 
-         Caption         =   "Fly &Disconnected"
+         Caption         =   "Fly Disconnected"
       End
       Begin VB.Menu mnuOptionsSavePassword 
          Caption         =   "Save &Password"
@@ -1253,6 +1258,13 @@ Begin VB.Form frmMain
       End
       Begin VB.Menu mnuOptionsGaugeIntegration 
          Caption         =   "&Gauge Integration"
+      End
+      Begin VB.Menu mnuOptionsSep3 
+         Caption         =   "-"
+      End
+      Begin VB.Menu mnuOptionsUpdateData 
+         Caption         =   "&Update Data Files"
+         Enabled         =   0   'False
       End
    End
    Begin VB.Menu mnuFailures 
@@ -1410,7 +1422,6 @@ Private Sub cmdPIREP_Click()
     Dim fRoot As String
 
     'Just file the PIREP if not a training flight
-    tmrFilePIREP.Enabled = False
     If Not info.TestFlight Then
         FilePIREP
         Exit Sub
@@ -1502,27 +1513,29 @@ Private Sub FilePIREP()
             If ((x Mod 4) = 0) Then
                 ReqStack.Send
                 frmMain.PositionProgress.Refresh
-                Call WaitForACK(msgID, 3000)
+                WaitForACK msgID, 2500
             End If
         Next
 
         'Clear the offline queue
+        ReqStack.Send
         Call Positions.Clear
+        WaitForACK msgID, 2500
     End If
     
     'End the flight (the ACARS server will discard multiple messages)
     msgID = SendEndFlight
     ReqStack.Send
-    WaitForACK msgID, 6500
+    WaitForACK msgID, 5000
 
     'Send the PIREP
     msgID = SendPIREP(info)
-    frmMain.PositionProgress.value = frmMain.PositionProgress.Max
     ShowMessage "Sending Flight Report " + Hex(msgID), ACARSTEXTCOLOR
+    frmMain.PositionProgress.value = frmMain.PositionProgress.Max
     ReqStack.Send
     
     'Wait for the ACK
-    If Not WaitForACK(msgID, 17500) Then
+    If Not WaitForACK(msgID, 15000) Then
         MsgBox "ACARS Server timed out sending Flight Report!" & vbCrLf & vbCrLf & _
             "You may want to disconnect, reconnect and try again. (You may also want to" & vbCrLf & _
             "check your Log Book - the flight may be logged.)", vbCritical Or vbOKOnly, "Flight Report Timed Out"
@@ -1816,6 +1829,16 @@ Private Sub mnuHelpAbout_Click()
     frmAbout.Show
 End Sub
 
+Private Sub mnuLoadACARSData_Click()
+    If info.InFlight Then
+        mnuLoadACARSData.Enabled = False
+        Exit Sub
+    End If
+
+    FData_Open
+    config.UpdateFlightInfo
+End Sub
+
 Private Sub mnuOpenFlightPlan_Click()
     FPlan_Open
     config.UpdateFlightInfo
@@ -1859,6 +1882,20 @@ End Sub
 Private Sub mnuCOMSterileCockpit_Click()
     config.SterileCockpit = Not config.SterileCockpit
     config.UpdateSettingsMenu
+End Sub
+
+Private Sub mnuOptionsUpdateData_Click()
+    'Make sure we're connected
+    If Not config.ACARSConnected Then
+        mnuOptionsUpdateData.Enabled = False
+        Exit Sub
+    End If
+
+    'Request data file update
+    RequestAirlines
+    RequestEquipment
+    RequestAirports
+    ReqStack.Send
 End Sub
 
 Private Sub mnuOptionsWideFS_Click()
@@ -1952,12 +1989,6 @@ Public Function StopFlight(Optional isError As Boolean = False) As Boolean
             info.GateTime.LocalTime = Now
             info.GateFuel = pos.Fuel
             info.GateWeight = pos.weight
-        End If
-        
-        'If we have the gauge enabled, start the timer
-        If Not tmrFilePIREP.Enabled And config.GaugeSupport And config.FSUIPCConnected Then
-            tmrFilePIREP.Enabled = True
-            ShowMessage "Starting PIREP filing timer", DEBUGTEXTCOLOR
         End If
     Else
         LockFlightInfo True
@@ -2240,6 +2271,13 @@ Sub StartFlight(Optional ShowDialogs As Boolean = True)
         End If
     End If
     
+    'Make sure we're "ready to fly"
+    If Not IsFSReady() Then
+        MsgBox "You must already have a flight started in Microsoft Flight Simulator.", _
+            vbExclamation, "Flight Not Started"
+        Exit Sub
+    End If
+    
     'Check for SB3
     If config.SB3Support Then
         config.SB3Connected = SB3Connected()
@@ -2408,61 +2446,15 @@ Private Sub tmrFailures_Timer()
     fCfg.DisableFailure FailureNames(failure)
 End Sub
 
-Private Sub tmrFilePIREP_Timer()
-    Dim gaugePhase As Integer
-
-    'Get the gauge phase
-    gaugePhase = GAUGE_GetPhase()
-    If (gaugePhase <> PIREPFILE) Then Exit Sub
-    tmrFilePIREP.Enabled = False
-    tmrPosUpdates.Enabled = False
-    tmrFlightTime.Enabled = False
-    tmrFailures.Enabled = False
-    cmdStartStopFlight.Enabled = False
-    ShowMessage "Filing Flight Report from Gauge", DEBUGTEXTCOLOR
-    If info.TestFlight Then
-        mnuFailures.Enabled = True
-        Exit Sub
-    End If
-    
-    'Connect to ACARS if not connected
-    If Not config.ACARSConnected Then
-        Dim totalTime As Integer
-        ToggleACARSConnection
-        
-        'Wait for connection results
-        While (totalTime < 5000) And Not config.ACARSConnected
-            DoEvents
-            Sleep 250
-            totalTime = totalTime + 250
-        Wend
-        
-        If Not config.ACARSConnected Then Exit Sub
-    End If
-            
-    'File the PIREP
-    FilePIREP
-End Sub
-
 Private Sub tmrFlightTime_Timer()
     Dim fTime As Date
-    Dim UpdateInterval As Long
-    Static LastUpdateTime As Date
     
     'Do nothing if flight not running
     If (pos Is Nothing) Then Exit Sub
     
-    'Calculate true time since last update
-    If (Year(LastUpdateTime) > 2005) Then
-        UpdateInterval = CLng(DateDiff("s", LastUpdateTime, Now)) * 1000
-    Else
-        UpdateInterval = tmrFlightTime.interval
-    End If
-    
     'Update the timers
-    LastUpdateTime = Now
     If Not pos.Paused And Not pos.Slewing Then
-        fTime = info.UpdateFlightTime(pos.simRate / 256, UpdateInterval)
+        fTime = info.UpdateFlightTime(pos.simRate / 256, tmrFlightTime.interval)
         sbMain.Panels(4).Text = "Flight Time: " + Format(fTime, "hh:mm:ss")
     Else
         info.UpdateFlightTime 0, tmrFlightTime.interval
@@ -2501,6 +2493,7 @@ Private Sub tmrPosUpdates_Timer()
     Static PauseStatus As Boolean
     
     Dim isPaused As Boolean
+    Dim isPhaseChanged As Boolean
     Dim CurrentDate As Date
     
     'Get position data
@@ -2522,7 +2515,8 @@ Private Sub tmrPosUpdates_Timer()
 
     'Check if the flight phase has changed
     If Not isPaused Then
-        If PhaseChanged(pos) Then
+        isPhaseChanged = PhaseChanged(pos)
+        If isPhaseChanged Then
             If config.ShowDebug Then ShowMessage "Phase changed to " & info.PhaseName, DEBUGTEXTCOLOR
             sbMain.Panels(2).Text = "Phase: " & info.PhaseName
             GAUGE_SetPhase info.FlightPhase, config.ACARSConnected
@@ -2588,11 +2582,67 @@ Private Sub tmrPosUpdates_Timer()
     If (config.PositionInterval <> newInterval) Then
         config.PositionInterval = newInterval
         If config.ShowDebug Then ShowMessage "Position Interval set to " + CStr(newInterval) + "s", DEBUGTEXTCOLOR
-    ElseIf Not pos.ACARSConnected Then
+    ElseIf Not isPhaseChanged Then
+        CheckGaugeStatus pos.ACARSConnected, pos.ACARSPhase
+    End If
+End Sub
+
+Public Sub CheckGaugeStatus(ByVal IsConnected As Boolean, ByVal GaugePhase As Integer)
+    Dim BadPhase As Boolean
+
+    'Check for invalid Gauge phase value
+    If (GaugePhase = PIREPFILE) Then
+        BadPhase = (info.FlightPhase <> ATGATE) And (info.FlightPhase <> SHUTDOWN) And (info.FlightPhase <> COMPLETE)
+    ElseIf Not IsConnected Then
         GAUGE_SetPhase info.FlightPhase, config.ACARSConnected
-    ElseIf ((pos.ACARSPhase <> info.FlightPhase) And (info.FlightPhase <> UNKNOWN)) Then
-        ShowMessage "ACARS Gauge phase set to " + CStr(info.FlightPhase) + ", was " + CStr(pos.ACARSPhase), ACARSERRORCOLOR
+        Exit Sub
+    Else
+        BadPhase = ((info.FlightPhase <> UNKNOWN) And (info.FlightPhase <> GaugePhase))
+    End If
+    
+    'Send warning message
+    If BadPhase Then
         GAUGE_SetPhase info.FlightPhase, config.ACARSConnected
+        ShowMessage "ACARS Gauge phase set to " + CStr(info.FlightPhase) + ", was " + _
+            CStr(GaugePhase), ACARSERRORCOLOR
+    ElseIf (GaugePhase = PIREPFILE) Then
+        If config.ShowDebug Then ShowMessage "Filing Flight Report from Gauge", DEBUGTEXTCOLOR
+        
+        'Stop timers
+        tmrPosUpdates.Enabled = False
+        tmrFlightTime.Enabled = False
+        tmrFailures.Enabled = False
+        cmdStartStopFlight.Enabled = False
+        info.InFlight = False
+        info.FlightPhase = COMPLETE
+        Set pos = Nothing
+        sbMain.Panels(2).Text = "Flight Phase: " & info.PhaseName
+        SetButtonMenuStates
+        
+        'Re-enable failures if test flight
+        If info.TestFlight Then
+            mnuFailures.Enabled = True
+            Exit Sub
+        End If
+    
+        'Connect to ACARS if not connected
+        If Not config.ACARSConnected Then
+            Dim totalTime As Integer
+            ToggleACARSConnection
+        
+            'Wait for connection results
+            While (totalTime < 5000) And Not (config.ACARSConnected And (info.FlightID <> 0))
+                DoEvents
+                Sleep 250
+                totalTime = totalTime + 250
+            Wend
+        
+            If Not config.ACARSConnected Then Exit Sub
+            Sleep 250
+        End If
+            
+        'File the PIREP
+        FilePIREP
     End If
 End Sub
 
@@ -2617,6 +2667,9 @@ Public Sub ToggleACARSConnection(Optional silent As Boolean = False)
                 vbOKOnly + vbExclamation, "Flight Simulator not started"
             Exit Sub
         End If
+        
+        'Bring to forefront
+        SetForegroundWindow frmMain.hWnd
     
         'Do the connection
         cmdConnectDisconnect.Enabled = False
@@ -2625,6 +2678,7 @@ Public Sub ToggleACARSConnection(Optional silent As Boolean = False)
         wsckMain.RemoteHost = config.ACARSHost
         wsckMain.RemotePort = config.ACARSPort
         config.SeenHELO = False
+        ReqStack.Reset
         wsckMain.Connect
         cmdPIREP.visible = info.FlightData
         cmdPIREP.Enabled = info.FlightData
@@ -2642,6 +2696,7 @@ Public Sub ToggleACARSConnection(Optional silent As Boolean = False)
         End If
         
         CloseACARSConnection
+        ReqStack.Reset
         cmdConnectDisconnect.Enabled = True
         info.Offline = True
         frmMain.cmdPIREP.visible = False
@@ -3205,6 +3260,9 @@ Private Sub ProcessUserCmd(strInput As String)
             If (UBound(aryParts) < 1) Then
                 ShowMessage "No Frequency specified", ACARSERRORCOLOR
                 Exit Sub
+            ElseIf Not config.FSUIPCConnected Then
+                ShowMessage "Flight Simulator not connected", ACARSERRORCOLOR
+                Exit Sub
             End If
             
             'Tune the COM1 radio to the frequency
@@ -3224,6 +3282,16 @@ Private Sub ProcessUserCmd(strInput As String)
             'Tune the ADF radio
             SetADF1 CStr(aryParts(1))
             
+        Case "xpdr"
+            'Make sure a frequency was specified
+            If (UBound(aryParts) < 1) Then
+                ShowMessage "No Frequency specified", ACARSERRORCOLOR
+                Exit Sub
+            End If
+            
+            'Tune the transponder
+            SetTX CStr(aryParts(1))
+            
         Case "kick", "ban"
             'Check our access Make sure a Pilot ID was specified
             If Not config.HasRole("Admin") Then
@@ -3239,6 +3307,12 @@ Private Sub ProcessUserCmd(strInput As String)
             ReqStack.Send
             
         Case "draft"
+            If Not config.ACARSConnected Then
+                ShowMessage "Not Connected to ACARS Server", ACARSERRORCOLOR
+                Exit Sub
+            End If
+            
+            'Request PIREP info
             RequestDraftPIREPs
             ReqStack.Send
             
@@ -3319,10 +3393,8 @@ Private Sub ProcessUserCmd(strInput As String)
             End If
             
             'Show command requiring active flight
-            If info.InFlight Then
-                ShowMessage ".com1 <frequency> - Tunes COM1 radio to a frequency", ACARSTEXTCOLOR
+            If info.InFlight Then _
                 ShowMessage ".progress - Show Flight Progress", ACARSTEXTCOLOR
-            End If
             
             'Show commands requiring SB3
             If config.SB3Connected Then _
@@ -3339,6 +3411,7 @@ Private Sub ProcessUserCmd(strInput As String)
                 ShowMessage ".com1 <freq> - Set COM1 radio frequency", ACARSTEXTCOLOR
                 ShowMessage ".com2 <freq> - Set COM2 radio frequency", ACARSTEXTCOLOR
                 ShowMessage ".adf <freq> - Set ADF1 radio frequency", ACARSTEXTCOLOR
+                ShowMessage ".xpdr <code> - Set Transponder code", ACARSTEXTCOLOR
             End If
             
             ShowMessage ".help - Display this help screen", ACARSTEXTCOLOR
@@ -3349,7 +3422,7 @@ Private Sub ProcessUserCmd(strInput As String)
     End Select
 End Sub
 
-Public Sub LockFlightInfo(IsEditable As Boolean)
+Public Sub LockFlightInfo(ByVal IsEditable As Boolean)
     txtFlightNumber.Enabled = IsEditable
     txtLeg.Enabled = IsEditable
     txtCruiseAlt.Enabled = IsEditable
@@ -3364,6 +3437,7 @@ Public Sub LockFlightInfo(IsEditable As Boolean)
     txtAirportL.Enabled = IsEditable
     chkCheckRide.Enabled = IsEditable
     chkTrainFlight.Enabled = IsEditable
+    mnuLoadACARSData.Enabled = IsEditable
 End Sub
 
 Public Sub ResetFlightInfo(Optional deleteSavedInfo As Boolean = True)
@@ -3402,13 +3476,18 @@ Public Sub ResetFlightInfo(Optional deleteSavedInfo As Boolean = True)
     config.UpdateFlightInfo
 End Sub
 
-Private Sub LockUserInfo(IsEditable As Boolean)
+Private Sub LockUserInfo(ByVal IsEditable As Boolean)
     txtPilotID.Enabled = IsEditable
     txtPassword.Enabled = IsEditable
     chkStealth.Enabled = IsEditable
+    mnuOptionsUpdateData.Enabled = Not IsEditable
 End Sub
 
 Private Sub SelectField(txt As TextBox)
     txt.SelStart = 0
     txt.SelLength = Len(txt.Text)
+End Sub
+
+Private Sub wsckMain_SendComplete()
+    If config.ShowDebug Then ShowDebug "Sent Message " + Hex(ReqStack.RequestID), DEBUGTEXTCOLOR
 End Sub

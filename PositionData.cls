@@ -44,6 +44,7 @@ Public AngleOfAttack As Double
 
 'Flight state flags
 Public Paused As Boolean
+Public Touchdown As Boolean
 Public Slewing As Boolean
 Public PUSHBACK As Boolean
 Public onGround As Boolean
@@ -177,6 +178,7 @@ Private Sub Class_Initialize()
     Spoilers = False
     GearDown = False
     onGround = False
+    Touchdown = False
     EnginesStarted = False
     Parked = False
     AfterBurner = False
@@ -191,7 +193,7 @@ Property Get Flags() As Long
     
     'Build the flags
     If Paused Then tmpFlags = tmpFlags Or FLIGHT_PAUSED
-    If Slewing Then tmpFlags = tmpFlags Or FLIGHT_SLEWING
+    If Touchdown Then tmpFlags = tmpFlags Or FLIGHT_TOUCHDOWN
     If Parked Then tmpFlags = tmpFlags Or FLIGHT_PARKED
     If onGround Then tmpFlags = tmpFlags Or FLIGHT_ONGROUND
     If Spoilers Then tmpFlags = tmpFlags Or FLIGHT_SP_ARM

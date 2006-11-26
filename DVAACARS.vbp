@@ -16,7 +16,7 @@ Module=RadioUpdate; RadioUpdate.bas
 Class=PositionData; PositionData.cls
 Class=FlightData; FlightData.cls
 Class=Configuration; Configuration.cls
-Module=SB3Support; FlightPlan.bas
+Module=FlightPlans; FlightPlan.bas
 Module=RequestReceiver; RequestReceiver.bas
 Module=modFDR; modFDR.bas
 Module=RequestSender; RequestSender.bas
@@ -67,7 +67,7 @@ Description="ACARS client for Delta Virtual Airlines pilots"
 CompatibleMode="0"
 MajorVer=1
 MinorVer=9
-RevisionVer=72
+RevisionVer=74
 AutoIncrementVer=0
 ServerSupportFiles=0
 VersionComments="FSUIPC Key = O7K11GQHV9D7"

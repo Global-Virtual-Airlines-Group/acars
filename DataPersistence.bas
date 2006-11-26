@@ -366,7 +366,7 @@ Public Function RestoreFlightData(ByVal flightCode As String) As SavedFlight
             'Build the flags
             Flags = CLng(getChild(p, "flags", "0"))
             sPos.Paused = hasFlag(Flags, FLIGHT_PAUSED)
-            sPos.Slewing = hasFlag(Flags, FLIGHT_SLEWING)
+            sPos.Touchdown = hasFlag(Flags, FLIGHT_TOUCHDOWN)
             sPos.Parked = hasFlag(Flags, FLIGHT_PARKED)
             sPos.onGround = hasFlag(Flags, FLIGHT_ONGROUND)
             sPos.Spoilers = hasFlag(Flags, FLIGHT_SP_ARM)
