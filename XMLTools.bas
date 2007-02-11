@@ -1,19 +1,19 @@
 Attribute VB_Name = "XMLTools"
 Option Explicit
 
-Public Function FormatDateTime(dt As Date, fmt As String) As String
+Public Function I18nOutputDateTime(dt As UTCDate, Optional fmt As String = "mm/dd/yyyy hh:nn:ss") As String
     Dim tmpDate As String
 
-    tmpDate = Replace(Format(dt, fmt), config.DateSeparator, "/")
-    FormatDateTime = Replace(tmpDate, config.TimeSeparator, ":")
+    tmpDate = Replace(Format(dt.UTCTime, fmt), config.DateSeparator, "/")
+    tmpDate = Replace(tmpDate, config.TimeSeparator, ":")
+    I18nOutputDateTime = tmpDate & "." & CStr(dt.MilliSeconds)
 End Function
 
-Public Function ParseDateTime(dt As String) As Date
+Public Function I18nDateTime(dt As String) As String
     Dim tmpDate As String
     
     tmpDate = Replace(dt, "/", config.DateSeparator)
-    tmpDate = Replace(tmpDate, ":", config.TimeSeparator)
-    ParseDateTime = CDate(tmpDate)
+    I18nDateTime = Replace(tmpDate, ":", config.TimeSeparator)
 End Function
 
 Public Function FormatNumber(num As Double, fmt As String) As String

@@ -15,6 +15,11 @@ Private Function buildCMD(cmdType As String) As IXMLDOMElement
     Set buildCMD = cmdE
 End Function
 
+Public Sub Ping()
+    If config.ShowDebug Then ShowMessage "Pinging Socket", DEBUGTEXTCOLOR
+    frmMain.wsckMain.SendData Chr(0)
+End Sub
+
 Public Sub RequestPilotList()
     Dim cmd As IXMLDOMElement
     
@@ -63,8 +68,9 @@ Public Function SendFlightInfo(fInfo As FlightData) As Long
     AddXMLField cmd, "airportA", fInfo.AirportA.IATA, False
     AddXMLField cmd, "route", fInfo.Route, True
     AddXMLField cmd, "remarks", fInfo.Remarks, True
-    AddXMLField cmd, "startTime", FormatDateTime(fInfo.StartTime.UTCTime, "mm/dd/yyyy hh:nn:ss")
+    AddXMLField cmd, "startTime", I18nOutputDateTime(fInfo.StartTime)
     AddXMLField cmd, "fs_ver", CStr(fInfo.FSVersion), False
+    If fInfo.ScheduleVerified Then AddXMLField cmd, "scheduleValidated", "true", False
     If fInfo.Offline Then AddXMLField cmd, "offline", "true", False
     If (fInfo.FlightPhase = COMPLETE) Then AddXMLField cmd, "complete", "true", False
     If (fInfo.FlightID > 0) Then
@@ -79,6 +85,30 @@ Public Function SendFlightInfo(fInfo As FlightData) As Long
     If config.ShowDebug Then ShowMessage "Sent flight info " & Hex(SendFlightInfo), DEBUGTEXTCOLOR
 End Function
 
+Public Function RequestScheduleValidation(ad As Airport, aa As Airport) As Long
+    Dim doc As New DOMDocument
+    Dim cmd As IXMLDOMElement
+    Dim Flags As IXMLDOMElement
+    
+    'Build the request
+    Set cmd = buildCMD("datareq")
+    AddXMLField cmd, "reqtype", "sched", False
+    
+    'Set the airports in the flags
+    Set Flags = doc.createNode(NODE_ELEMENT, "flags", "")
+    cmd.appendChild Flags
+    AddXMLField Flags, "airportD", ad.ICAO, False
+    AddXMLField Flags, "airportA", aa.ICAO, False
+    AddXMLField Flags, "maxResults", "1", False
+
+    'Queue the request
+    ReqStack.Queue cmd
+    RequestScheduleValidation = ReqStack.RequestID
+    
+    If config.ShowDebug Then ShowMessage "Requested schedule validation from " & _
+        ad.name & " (" & ad.ICAO & ") to " & aa.name & " (" & aa.ICAO & ")", DEBUGTEXTCOLOR
+End Function
+
 Public Sub RequestPilotInfo(PilotID As String)
     Dim doc As New DOMDocument
     Dim cmd As IXMLDOMElement
@@ -86,7 +116,7 @@ Public Sub RequestPilotInfo(PilotID As String)
 
     'Build the request
     Set cmd = buildCMD("datareq")
-    AddXMLField cmd, "reqtype", "pilot"
+    AddXMLField cmd, "reqtype", "pilot", False
 
     'Set the pilot ID in the flags
     Set Flags = doc.createNode(NODE_ELEMENT, "flags", "")
@@ -185,6 +215,7 @@ Public Sub RequestCharts(AirportCode As String)
     Set Flags = doc.createNode(NODE_ELEMENT, "flags", "")
     cmd.appendChild Flags
     AddXMLField Flags, "id", UCase(AirportCode), False
+    AddXMLField Flags, "includePDF", "true", False
     ReqStack.Queue cmd
 
     If config.ShowDebug Then ShowMessage "Sent Approach Chart request", DEBUGTEXTCOLOR
@@ -218,7 +249,7 @@ Public Sub SendChat(msgText As String, Optional msgTo As String)
     
         AddXMLField cmd, "to", p.ID
         If config.ShowPilotNames Then
-            msgFrom = msgFrom + "->" + p.Name
+            msgFrom = msgFrom + "->" + p.name
         Else
             msgFrom = msgFrom + "->" + p.ID
         End If
@@ -235,11 +266,12 @@ End Sub
 Public Function SendCredentials(userID As String, pwd As String) As Long
     Dim cmd As IXMLDOMElement
     Dim isStealth As Boolean
+    Dim now As New UTCDate
     
     'Log stealth mode
     isStealth = (frmMain.chkStealth.value = 1) And config.HasRole("HR")
     If isStealth And config.ShowDebug Then ShowMessage "Hidden/Stealth Connection", DEBUGTEXTCOLOR
-
+    
     'Build the request
     Set cmd = buildCMD("auth")
 
@@ -249,6 +281,7 @@ Public Function SendCredentials(userID As String, pwd As String) As Long
     AddXMLField cmd, "build", CStr(App.Revision), False
     AddXMLField cmd, "stealth", CStr(isStealth), False
     AddXMLField cmd, "version", "v" & CStr(App.Major) & "." & CStr(App.Minor), False
+    AddXMLField cmd, "localUTC", I18nOutputDateTime(now), True
     ReqStack.Queue cmd
     SendCredentials = ReqStack.RequestID
 
@@ -352,7 +385,7 @@ Public Function SendPosition(ByVal cPos As PositionData, ByVal IsLogged As Boole
     AddXMLField cmd, "weight", CStr(cPos.weight), False
     AddXMLField cmd, "wHdg", CStr(cPos.WindHeading), False
     AddXMLField cmd, "wSpeed", CStr(cPos.WindSpeed), False
-    AddXMLField cmd, "date", FormatDateTime(cPos.DateTime.UTCTime, "mm/dd/yyyy hh:nn:ss")
+    AddXMLField cmd, "date", I18nOutputDateTime(cPos.DateTime)
     AddXMLField cmd, "flags", CStr(cPos.Flags), False
     AddXMLField cmd, "frameRate", CStr(cPos.FrameRate), False
     If noFlood Then AddXMLField cmd, "noFlood", "true", False
@@ -388,22 +421,22 @@ Public Function SendPIREP(info As FlightData) As Long
     AddXMLField cmd, "airportA", info.AirportA.IATA, False
     AddXMLField cmd, "remarks", info.Remarks, True
     AddXMLField cmd, "network", info.Network, False
-    AddXMLField cmd, "startTime", FormatDateTime(info.StartTime.UTCTime, "mm/dd/yyyy hh:nn:ss")
-    AddXMLField cmd, "taxiOutTime", FormatDateTime(info.TaxiOutTime.UTCTime, "mm/dd/yyyy hh:nn:ss")
+    AddXMLField cmd, "startTime", I18nOutputDateTime(info.StartTime)
+    AddXMLField cmd, "taxiOutTime", I18nOutputDateTime(info.TaxiOutTime)
     AddXMLField cmd, "taxiFuel", CStr(info.TaxiFuel), False
     AddXMLField cmd, "taxiWeight", CStr(info.TaxiWeight), False
-    AddXMLField cmd, "takeoffTime", FormatDateTime(info.TakeoffTime.UTCTime, "mm/dd/yyyy hh:nn:ss")
+    AddXMLField cmd, "takeoffTime", I18nOutputDateTime(info.TakeoffTime)
     AddXMLField cmd, "takeoffFuel", CStr(info.TakeoffFuel), False
     AddXMLField cmd, "takeoffWeight", CStr(info.TakeoffWeight), False
     AddXMLField cmd, "takeoffN1", FormatNumber(info.TakeoffN1, "##0.0")
     AddXMLField cmd, "takeoffSpeed", CStr(info.TakeoffSpeed), False
-    AddXMLField cmd, "landingTime", FormatDateTime(info.LandingTime.UTCTime, "mm/dd/yyyy hh:nn:ss")
+    AddXMLField cmd, "landingTime", I18nOutputDateTime(info.LandingTime)
     AddXMLField cmd, "landingFuel", CStr(info.LandingFuel), False
     AddXMLField cmd, "landingWeight", CStr(info.LandingWeight), False
     AddXMLField cmd, "landingN1", FormatNumber(info.LandingN1, "##0.0")
     AddXMLField cmd, "landingSpeed", CStr(info.LandingSpeed), False
     AddXMLField cmd, "landingVSpeed", CStr(info.LandingVSpeed), False
-    AddXMLField cmd, "gateTime", FormatDateTime(info.GateTime.UTCTime, "mm/dd/yyyy hh:nn:ss")
+    AddXMLField cmd, "gateTime", I18nOutputDateTime(info.GateTime)
     AddXMLField cmd, "gateFuel", CStr(info.GateFuel), False
     AddXMLField cmd, "gateWeight", CStr(info.GateWeight), False
     AddXMLField cmd, "time0X", CStr(info.TimePaused), False

@@ -54,6 +54,7 @@ Public simRate As Integer
 Public CockpitView As Boolean
 Public Stall As Boolean
 Public Overspeed As Boolean
+Public Crashed As Boolean
 
 'Autopilot flags
 Public AP_HDG As Boolean
@@ -165,7 +166,6 @@ Property Get FuelFlow() As Long
 End Property
 
 Private Sub Class_Initialize()
-    DateTime.LocalTime = Now
     AP_HDG = False
     AP_NAV = False
     AP_GPS = False
@@ -184,6 +184,7 @@ Private Sub Class_Initialize()
     AfterBurner = False
     Stall = False
     Overspeed = False
+    Crashed = False
 End Sub
 
 Property Get Flags() As Long
@@ -201,6 +202,7 @@ Property Get Flags() As Long
     If AfterBurner Then tmpFlags = tmpFlags Or FLIGHT_AFTERBURNER
     If Overspeed Then tmpFlags = tmpFlags Or FLIGHT_OVERSPEED
     If Stall Then tmpFlags = tmpFlags Or FLIGHT_STALL
+    If Crashed Then tmpFlags = tmpFlags Or FLIGHT_CRASH
     If AP_NAV Then tmpFlags = tmpFlags Or FLIGHT_AP_NAV
     If AP_GPS Then tmpFlags = tmpFlags Or FLIGHT_AP_GPS
     If AP_HDG Then tmpFlags = tmpFlags Or FLIGHT_AP_HDG
@@ -208,33 +210,6 @@ Property Get Flags() As Long
     If AP_ALT Then tmpFlags = tmpFlags Or FLIGHT_AP_ALT
     If AT_IAS Then tmpFlags = tmpFlags Or FLIGHT_AT_IAS
     If AT_MCH Then tmpFlags = tmpFlags Or FLIGHT_AT_MACH
-    
     Flags = tmpFlags
 End Property
 
-Property Get WarningCode() As Integer
-
-    WarningCode = 0
-    If ((Airspeed >= 250) And (AltitudeMSL < 10000)) Then
-        WarningCode = 1
-        'above 250 under 10k
-    ElseIf ((AltitudeAGL < 1500) And (VerticalSpeed < -1500)) Then
-        WarningCode = 2
-        'excessive descent on final
-    ElseIf (Abs(Bank) > 45) Then
-        WarningCode = 3
-        'excessive bank
-    ElseIf (Abs(Pitch) > 35) Then
-        WarningCode = 4
-        'excessive pitch
-    ElseIf (Abs(1 - GForce) > 0.25) Then
-        WarningCode = 5
-        'excessive Gs
-    ElseIf Stall Then
-        WarningCode = 6
-        'Stall
-    ElseIf Overspeed Then
-        WarningCode = 7
-        'Overspeed
-    End If
-End Property
