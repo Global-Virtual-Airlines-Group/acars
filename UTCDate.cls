@@ -31,6 +31,8 @@ Private Type SYSTEMTIME
     wMilliseconds As Integer
 End Type
 
+Private Declare Sub GetSystemTime Lib "kernel32" (lpSystemTime As SYSTEMTIME)
+
 Private Declare Function FileTimeToLocalFileTime Lib "kernel32" (lpFileTime As FILETIME, lpLocalFileTime As FILETIME) As Long
 Private Declare Function LocalFileTimeToFileTime Lib "kernel32" (lpLocalFileTime As FILETIME, lpFileTime As FILETIME) As Long
 Private Declare Function FileTimeToSystemTime Lib "kernel32" (lpFileTime As FILETIME, lpSystemTime As SYSTEMTIME) As Long
@@ -50,16 +52,26 @@ Private Function ConvertDate(dt As Date) As SYSTEMTIME
     result.wHour = Hour(dt)
     result.wMinute = Minute(dt)
     result.wSecond = Second(dt)
+    result.wMilliseconds = 0
     ConvertDate = result
 End Function
 
 Public Sub Class_Initialize()
-    Me.LocalTime = DateSerial(1899, 12, 31)
+    SetNow
 End Sub
 
-Property Let LocalTime(dt As Date)
-    LocalSystemTime = ConvertDate(dt)
-End Property
+Public Sub SetNow()
+    Dim utc_sTime As SYSTEMTIME
+    
+    GetSystemTime utc_sTime
+    UTCTime = ConvertSYSTEMTIME(utc_sTime)
+    MilliSeconds = utc_sTime.wMilliseconds
+End Sub
+
+Public Sub Clone(ByVal d2 As UTCDate)
+    Me.UTCTime = d2.UTCTime
+    Me.MilliSeconds = d2.MilliSeconds
+End Sub
 
 Property Get LocalTime() As Date
     LocalTime = ConvertSYSTEMTIME(LocalSystemTime)
@@ -77,6 +89,14 @@ Property Let UTCTime(dt As Date)
     FileTimeToSystemTime loc_fTime, LocalSystemTime
 End Property
 
+Property Let MilliSeconds(ms As Integer)
+    LocalSystemTime.wMilliseconds = ms
+End Property
+
+Property Get MilliSeconds() As Integer
+    MilliSeconds = LocalSystemTime.wMilliseconds
+End Property
+
 Property Get UTCTime() As Date
     Dim utc_fTime As FILETIME
     Dim loc_fTime As FILETIME
@@ -87,4 +107,24 @@ Property Get UTCTime() As Date
     LocalFileTimeToFileTime loc_fTime, utc_fTime
     FileTimeToSystemTime utc_fTime, utc_sTime
     UTCTime = ConvertSYSTEMTIME(utc_sTime)
+End Property
+
+Property Let ParseUTCTime(d As String)
+    Dim utc_sTime As SYSTEMTIME
+    Dim utc_fTime As FILETIME
+    Dim loc_fTime As FILETIME
+    Dim pos As Integer
+
+    pos = InStr(d, ".")
+    If (pos > 0) Then
+        utc_sTime = ConvertDate(CDate(Left(d, pos - 1)))
+        utc_sTime.wMilliseconds = CInt(Mid(d, pos + 1))
+    Else
+        utc_sTime = ConvertDate(CDate(d))
+        utc_sTime.wMilliseconds = LocalSystemTime.wMilliseconds
+    End If
+    
+    SystemTimeToFileTime utc_sTime, utc_fTime
+    FileTimeToLocalFileTime utc_fTime, loc_fTime
+    FileTimeToSystemTime loc_fTime, LocalSystemTime
 End Property

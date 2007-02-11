@@ -33,6 +33,7 @@ Public Const FLIGHT_AFTERBURNER = &H40&
 Public Const FLIGHT_PUSHBACK = &H8000&
 Public Const FLIGHT_STALL = &H10000
 Public Const FLIGHT_OVERSPEED = &H20000
+Public Const FLIGHT_CRASH = &H40000
 
 Public Const FLIGHT_AP_GPS = &H100&
 Public Const FLIGHT_AP_NAV = &H200&
@@ -52,10 +53,15 @@ Private Const KEY_TOGGLE_FUEL_VALVE_ENG2 = 66495
 Private Const KEY_TOGGLE_FUEL_VALVE_ENG3 = 66496
 Private Const KEY_TOGGLE_FUEL_VALVE_ENG4 = 66497
 Private Const KEY_PARK_BRAKE = 65752
+Private Const KEY_PAUSE_ON = 65794
+Private Const KEY_PAUSE_OFF = 65795
 
 'Load/Save flight codes
 Public Const FLIGHT_LOAD = 0
 Public Const FLIGHT_SAVE = 1
+
+'Because VB6 is stupid
+Private Const pi As Double = 3.14159265358979
 
 Private Type FSCONTROL
     ID As Long
@@ -86,7 +92,7 @@ Dim VSpeed As Long
 Dim TSpeed As Long
 Dim Mach As Long
 Dim Gs As Integer
-Dim AofA As Integer
+Dim AofA As Double
 
 Dim Bank As Long
 Dim Pitch As Long
@@ -101,6 +107,7 @@ Dim isPaused As Integer
 Dim isFrozen As Byte
 Dim isPushBack As Long
 Dim isSlew As Integer
+Dim isCrash As Integer
 Dim isReplay As Long
 Dim isCockpitView As Byte
 Dim isOverspeed As Byte
@@ -125,7 +132,8 @@ Call FSUIPC_Read(&H574, 4, VarPtr(altMSL), lngResult)
 Call FSUIPC_Read(&H2A0, 2, VarPtr(magVar), lngResult)
 Call FSUIPC_Read(&H580, 4, VarPtr(hdg), lngResult)
 Call FSUIPC_Read(&H11BA, 2, VarPtr(Gs), lngResult)
-Call FSUIPC_Read(&H11BE, 2, VarPtr(AofA), lngResult)
+'Call FSUIPC_Read(&H11BE, 2, VarPtr(AofA), lngResult)
+Call FSUIPC_Read(&H2ED0, 8, VarPtr(AofA), lngResult)
 
 'Get air speed/ground speed/vertical speed/Mach
 Call FSUIPC_Read(&H2BC, 4, VarPtr(ASpeed), lngResult)
@@ -146,6 +154,7 @@ Call FSUIPC_Read(&H264, 2, VarPtr(isPaused), lngResult)
 Call FSUIPC_Read(&H3365, 1, VarPtr(isFrozen), lngResult)
 Call FSUIPC_Read(&H5DC, 2, VarPtr(isSlew), lngResult)
 Call FSUIPC_Read(&H628, 4, VarPtr(isReplay), lngResult)
+Call FSUIPC_Read(&H840, 2, VarPtr(isCrash), lngResult)
 Call FSUIPC_Read(&H8320, 1, VarPtr(isCockpitView), lngResult)
 Call FSUIPC_Read(&H31F0, 4, VarPtr(isPushBack), lngResult)
 
@@ -229,12 +238,12 @@ Call FSUIPC_Read(&HBC8, 2, VarPtr(isParkBrake), lngResult)
 
 Dim WindSpeed As Integer
 Dim WindHeading As Long
-Dim sWindCeiling As Integer
+Dim WindCeiling As Integer
 
 'Get wind data
 Call FSUIPC_Read(&HE90, 2, VarPtr(WindSpeed), lngResult)
 Call FSUIPC_Read(&HE92, 2, VarPtr(WindHeading), lngResult)
-Call FSUIPC_Read(&HEEE, 2, VarPtr(sWindCeiling), lngResult)
+Call FSUIPC_Read(&HEEE, 2, VarPtr(WindCeiling), lngResult)
 
 Dim GaugeConnect As Byte
 Dim GaugePhase As Byte
@@ -248,7 +257,7 @@ Call FSUIPC_Read(GAUGE_BASE + 28, 1, VarPtr(SetRadio), lngResult)
 Call FSUIPC_Read(GAUGE_BASE + 29, 1, VarPtr(RadioCode), lngResult)
 
 'Call FSUIPC and create the flight data bean
-Dim data As New PositionData
+50 Dim data As New PositionData
 data.phase = info.PhaseName
 If Not FSUIPC_Process(lngResult) Then
     FSError lngResult
@@ -273,7 +282,8 @@ End If
 
 'Calculate G-force/Angle of Attack
 data.GForce = Gs / 625#
-data.AngleOfAttack = 100 - (100# * AofA / 32767)
+'data.AngleOfAttack = 100 - (100# * AofA / 32767)
+data.AngleOfAttack = AofA * 180 / pi
 
 'Calculate Altitude AGL/MSL
 65 terrElevation = (terrElevation * 3.28084) / 256
@@ -291,7 +301,7 @@ If (data.Heading < 0) Then data.Heading = (360 + data.Heading)
 data.WindSpeed = WindSpeed
 
 'Adjust surface wind heading if magnetic and not true
-68 If (data.AltitudeMSL > sWindCeiling) Then
+68 If (data.AltitudeMSL > WindCeiling) Then
     data.WindHeading = data.WindHeading - magVar
     If (data.WindHeading < 0) Then data.WindHeading = (360 + data.WindHeading)
 End If
@@ -361,6 +371,7 @@ data.onGround = (isOnGround = 1)
 data.Spoilers = (Spoilers = 4800)
 data.GearDown = (gearPos > 8192)
 data.PUSHBACK = (isPushBack <> 3)
+data.Crashed = (isCrash <> 0)
 data.AP_GPS = isAP And (NAVmode = 1) And (GPSmode = 1)
 data.AP_NAV = isAP And (NAVmode = 1) And (GPSmode = 0)
 data.AP_HDG = isAP And (HDGmode = 1)
@@ -404,7 +415,7 @@ Public Function PhaseChanged(cPos As PositionData) As Boolean
             ElseIf (cPos.GroundSpeed > 3) Then
                 info.FlightPhase = TAXI_OUT
                 TakeoffCheckCount = 0
-                info.TaxiOutTime.LocalTime = Now
+                info.TaxiOutTime.SetNow
                 info.TaxiFuel = cPos.Fuel
                 info.TaxiWeight = cPos.weight
                 PhaseChanged = True
@@ -415,7 +426,7 @@ Public Function PhaseChanged(cPos As PositionData) As Boolean
             'If we are moving forward, we enter the Taxi Out phase.
             If Not cPos.PUSHBACK Then
                 info.FlightPhase = TAXI_OUT
-                info.TaxiOutTime.LocalTime = Now
+                info.TaxiOutTime.SetNow
                 info.TaxiFuel = cPos.Fuel
                 info.TaxiWeight = cPos.weight
                 PhaseChanged = True
@@ -435,13 +446,13 @@ Public Function PhaseChanged(cPos As PositionData) As Boolean
             
             If ((TakeoffCheckCount > 15) Or (cPos.Airspeed > 60)) Then
                 info.FlightPhase = TAKEOFF
-                info.TakeoffTime.LocalTime = Now
+                info.TakeoffTime.SetNow
                 If config.SB3Connected Then SB3Transponder True
                 PhaseChanged = True
                 If Not config.GaugeSupport Then ShowFSMessage "Takeoff Detected", False, 5
             ElseIf Not cPos.onGround And (cPos.AltitudeAGL > 15) And (cPos.Airspeed > 45) Then
                 info.FlightPhase = AIRBORNE
-                info.TakeoffTime.LocalTime = Now
+                info.TakeoffTime.SetNow
                 If config.SB3Connected Then SB3Transponder True
                 info.TakeoffSpeed = cPos.Airspeed
                 info.TakeoffFuel = cPos.Fuel
@@ -460,10 +471,13 @@ Public Function PhaseChanged(cPos As PositionData) As Boolean
                 info.TakeoffFuel = cPos.Fuel
                 info.TakeoffWeight = cPos.weight
                 info.TakeoffN1 = cPos.AverageN1
-                info.TakeoffTime.LocalTime = Now
+                info.TakeoffTime.SetNow
                 ShowWeight cPos.weight, cPos.Fuel
                 If Not config.GaugeSupport Then ShowFSMessage "LIFTOFF at " & CStr(cPos.Airspeed) & " knots", False, 8
                 PhaseChanged = True
+                
+                'Turn on crash detection
+                If config.CrashDetect Then SetCrashDetection True
                 
                 'Send position report
                 pos.Touchdown = True
@@ -479,21 +493,27 @@ Public Function PhaseChanged(cPos As PositionData) As Boolean
             End If
             
         Case AIRBORNE
-            'If we've been in the Airborne phase for more than 15 seconds, and now
-            'we're back on the ground, then we enter the Landed phase. The 15 seconds
+            'If we've been in the Airborne phase for more than 10 seconds, and now
+            'we're back on the ground, then we enter the Landed phase. The 10 seconds
             'is for debouncing.
             If cPos.onGround Then
                 Dim AirborneDuration As Long
                 
+                'Check for bounces
                 AirborneDuration = DateDiff("s", info.TakeoffTime.LocalTime, Now)
-                If (AirborneDuration < 15) Then Exit Function
-                info.FlightPhase = ROLLOUT
-                info.LandingTime.LocalTime = Now
+                If (AirborneDuration < 5) And Not cPos.Crashed Then
+                    If config.ShowDebug Then ShowMessage "Takeoff Bounce detected after " & CStr(AirborneDuration) & _
+                        "s", DEBUGTEXTCOLOR
+                    Exit Function
+                End If
+                
+                info.LandingTime.SetNow
                 info.LandingSpeed = cPos.Airspeed
                 info.LandingVSpeed = cPos.TouchdownSpeed
                 info.LandingFuel = cPos.Fuel
                 info.LandingWeight = cPos.weight
                 info.LandingN1 = cPos.AverageN1
+                info.FlightPhase = ROLLOUT
                 ShowWeight cPos.weight, cPos.Fuel
                 ShowMessage "Touchdown speed: " & Format(cPos.TouchdownSpeed, "##0.0") & _
                     " feet/minute", ACARSTEXTCOLOR
@@ -514,10 +534,13 @@ Public Function PhaseChanged(cPos As PositionData) As Boolean
             'If ground speed falls below 30 knots, we enter the Taxi In phase.
             If (cPos.GroundSpeed < 30) Then
                 info.FlightPhase = TAXI_IN
-                info.TaxiInTime.LocalTime = Now
+                info.TaxiInTime.SetNow
                 info.FlightData = True
                 If config.SB3Connected Then SB3Transponder False
                 PhaseChanged = True
+                                
+                'Turn off crash detection
+                If config.CrashDetect Then SetCrashDetection False
             ElseIf (Not cPos.onGround And (cPos.AltitudeAGL > 3)) Then
                 info.FlightPhase = AIRBORNE
                 If config.SB3Connected Then SB3Transponder True
@@ -536,7 +559,7 @@ Public Function PhaseChanged(cPos As PositionData) As Boolean
             'If parking brake is set, we enter the "At Gate" phase.
             If cPos.Parked Then
                 info.FlightPhase = ATGATE
-                info.GateTime.LocalTime = Now
+                info.GateTime.SetNow
                 info.GateFuel = cPos.Fuel
                 info.GateWeight = cPos.weight
                 PhaseChanged = True
@@ -546,7 +569,7 @@ Public Function PhaseChanged(cPos As PositionData) As Boolean
             'If all engines are shut down, we enter the Shutdown phase.
              If Not cPos.EnginesStarted Then
                 info.FlightPhase = SHUTDOWN
-                info.ShutdownTime.LocalTime = Now
+                info.ShutdownTime.SetNow
                 info.ShutdownFuel = cPos.Fuel
                 info.ShutdownWeight = cPos.weight
                 ShowWeight cPos.weight, cPos.Fuel
@@ -679,15 +702,15 @@ Private Function UpdateJetPosInterval() As Integer
     ElseIf ((info.FlightPhase = TAXI_OUT) Or (info.FlightPhase = TAXI_IN)) Then
         UpdateJetPosInterval = 10
     ElseIf ((info.FlightPhase = TAKEOFF) Or (info.FlightPhase = ROLLOUT)) Then
-        UpdateJetPosInterval = 6
+        UpdateJetPosInterval = 5
     ElseIf (pos.GroundSpeed < 175) Then
-        UpdateJetPosInterval = 9
+        UpdateJetPosInterval = 8
     ElseIf (pos.GroundSpeed < 235) Then
         UpdateJetPosInterval = 10
     ElseIf (pos.GroundSpeed < 255) Then
-        UpdateJetPosInterval = 14
+        UpdateJetPosInterval = 15
     ElseIf (pos.GroundSpeed < 295) Then
-        UpdateJetPosInterval = 20
+        UpdateJetPosInterval = 25
     ElseIf (pos.GroundSpeed < 560) Then
         UpdateJetPosInterval = 60
     Else
@@ -762,9 +785,11 @@ Public Function GetAircraftInfo() As AircraftInfo
     'Determine AGL offset
     Dim terrElevation As Long
     Dim altMSL As Long
+    Dim isOnGround As Integer
     
 30  Call FSUIPC_Read(&H20, 4, VarPtr(terrElevation), dwResult)
     Call FSUIPC_Read(&H574, 4, VarPtr(altMSL), dwResult)
+    Call FSUIPC_Read(&H366, 2, VarPtr(isOnGround), dwResult)
 
     'Do the FSUIPC call
     If Not FSUIPC_Process(dwResult) Then
@@ -791,13 +816,16 @@ Public Function GetAircraftInfo() As AircraftInfo
     
     'Calculate the AGL offset
 60  terrElevation = (terrElevation * 3.28084) / 256
-    altMSL = altMSL * 3.28084
-    airInfo.BaseAGL = altMSL - terrElevation
+    altMSL = (altMSL * 3.28084)
+    If (isOnGround = 1) Then
+        airInfo.BaseAGL = altMSL - terrElevation
+    Else
+        airInfo.BaseAGL = 5
+    End If
     
     'Parse the null-terminated strings
 70  airInfo.FSPath = BytesToStr(FSBytes)
     airInfo.AirPath = airInfo.FSPath + BytesToStr(AIRBytes)
-    airInfo.MaxGrossWeight = CLng(ReadINI("WEIGHT_AND_BALANCE", "max_gross_weight", "0", airInfo.CFGFile))
     
     'Check for PMDG 737
 75  For x = 0 To UBound(PMDGAirNames)
@@ -817,7 +845,6 @@ Public Function GetAircraftInfo() As AircraftInfo
     
     'Load the ICAO/IATA code
 100 airInfo.code = UCase(ReadINI("General", "atc_model", "", airInfo.CFGFile))
-    airInfo.FuelProfile = ReadINI("General", "ACARSFuelProfile", "", airInfo.CFGFile)
     
     'Display conditions
     If config.ShowDebug Then
@@ -854,7 +881,7 @@ Private Function BytesToStr(ByRef chars() As Byte) As String
 End Function
 
 Public Function IsFSRunning() As Boolean
-    IsFSRunning = (FindWindow("FS98MAIN", vbNullString) <> 0)
+    IsFSRunning = (FindWindow("FS98MAIN", vbNullString) <> 0) Or (FindWindow("X-System", vbNullString) <> 0)
     If Not IsFSRunning And config.FSUIPCConnected Then FSUIPC_Close
 End Function
 
@@ -877,140 +904,43 @@ Public Function IsFSReady() As Boolean
     IsFSReady = (isReady = 0) And (inMenu = 0)
 End Function
 
-Public Sub ColdDarkCockpit(Optional BatteryOff As Boolean = True)
-    Dim dwResult As Long
-    Dim Battery As Long
-    Dim engCtl As FSCONTROL
-    
-    'If we don't have aircraft info, abort
-    If (acInfo Is Nothing) Then Exit Sub
-    
-    'Kill all engines
-    engCtl.ID = KEY_TOGGLE_FUEL_VALVE_ALL
-    engCtl.value = 0
-    Call FSUIPC_Write(&H3110, 8, VarPtr(engCtl), dwResult)
-    
-    'Kill Avionics
-    If config.ShowDebug Then ShowMessage "Shutting down Avionics", DEBUGTEXTCOLOR
-    Call FSUIPC_Write(&H3103, 1, VarPtr(Battery), dwResult)
-    
-    'Kill battery
-    If BatteryOff Then
-        If config.ShowDebug Then ShowMessage "Shutting down Battery", DEBUGTEXTCOLOR
-        Call FSUIPC_Write(&H3102, 1, VarPtr(Battery), dwResult)
-        Call FSUIPC_Write(&H281C, 4, VarPtr(Battery), dwResult)
-    End If
+Public Sub SetCrashDetection(Optional detectCrash As Boolean = True)
+    Dim CrashDetect As Long
+    Dim lngResult As Long
 
-    'Do the FSUIPC call
-    If Not FSUIPC_Process(dwResult) Then ShowMessage "Error setting Cold and Dark cockpit", ACARSERRORCOLOR
+    If detectCrash Then
+        CrashDetect = 2
+        ShowMessage "Enabling Crash Detection", ACARSTEXTCOLOR
+    Else
+        CrashDetect = 0
+        ShowMessage "Disabling Crash Detection", ACARSTEXTCOLOR
+    End If
+    
+    'Write to FSUIPC
+    Call FSUIPC_Write(&H830, 4, VarPtr(CrashDetect), lngResult)
+    If Not FSUIPC_Process(lngResult) Then ShowMessage "Error setting Crash Detection", ACARSERRORCOLOR
 End Sub
 
-Public Sub DoFailure(ByVal FailureType As String)
-    Dim dwResult As Long
-    Dim engine As Integer
-    Dim FailOn As Byte
-    Dim FuelCutoff As Integer, fuelCtl As FSCONTROL
+Public Sub SetPause(Optional pause As Boolean = True)
+    Dim doPause As Integer
+    Dim pCtl As FSCONTROL
+    Dim lngResult As Long
     
-    Static EngineFailures As Integer
-    Static MultiFailures As Integer
-    
-    'Check for engine/reverser failure
-    If ((Left(FailureType, 6) = "Engine") Or (Left(FailureType, 3) = "Rev")) Then
-        engine = CInt(Right(FailureType, 1)) - 1
-        FailureType = Left(FailureType, Len(FailureType) - 1)
+    pCtl.value = 0
+    If pause Then
+        doPause = 1
+        pCtl.ID = KEY_PAUSE_ON
+        If config.ShowDebug Then ShowMessage "Pausing Microsoft Flight Simulator", DEBUGTEXTCOLOR
+    Else
+        doPause = 0
+        pCtl.ID = KEY_PAUSE_OFF
+        If config.ShowDebug Then ShowMessage "Unpausing Microsoft Flight Simulator", DEBUGTEXTCOLOR
     End If
     
-    FailOn = 1
-    FuelCutoff = 0
-    Select Case (FailureType)
-        Case "ADF"
-            Call FSUIPC_Write(&HB64, 1, VarPtr(FailOn), dwResult)
-            Call FSUIPC_Write(&H3BD6, 1, VarPtr(FailOn), dwResult)
-        
-        Case "Altimeter"
-            Call FSUIPC_Write(&HB66, 1, VarPtr(FailOn), dwResult)
-            Call FSUIPC_Write(&H3BD8, 1, VarPtr(FailOn), dwResult)
-        
-        Case "Attitude"
-            Call FSUIPC_Write(&HB67, 1, VarPtr(FailOn), dwResult)
-            Call FSUIPC_Write(&H3BD9, 1, VarPtr(FailOn), dwResult)
-        
-        Case "Airspeed"
-            Call FSUIPC_Write(&HB6D, 1, VarPtr(FailOn), dwResult)
-            Call FSUIPC_Write(&H3BD7, 1, VarPtr(FailOn), dwResult)
-        
-        Case "COM1"
-            Call FSUIPC_Write(&HB68, 1, VarPtr(FailOn), dwResult)
-            Call FSUIPC_Write(&H3BDA, 1, VarPtr(FailOn), dwResult)
-        
-        Case "COM2"
-            Call FSUIPC_Write(&H3BDB, 1, VarPtr(FailOn), dwResult)
-        
-        Case "Compass"
-            Call FSUIPC_Write(&HB69, 1, VarPtr(FailOn), dwResult)
-            Call FSUIPC_Write(&H3BDC, 1, VarPtr(FailOn), dwResult)
-        
-        Case "Fuel"
-            Call FSUIPC_Write(&H3BDF, 1, VarPtr(FailOn), dwResult)
-        
-        Case "NAV1"
-            Call FSUIPC_Write(&HB70, 1, VarPtr(FailOn), dwResult)
-            Call FSUIPC_Write(&H3BE1, 1, VarPtr(FailOn), dwResult)
-        
-        Case "NAV2"
-            Call FSUIPC_Write(&H3BE2, 1, VarPtr(FailOn), dwResult)
-        
-        Case "Transponder"
-            Call FSUIPC_Write(&HB6F, 1, VarPtr(FailOn), dwResult)
-            Call FSUIPC_Write(&H3BE4, 1, VarPtr(FailOn), dwResult)
-        
-        Case "VSI"
-            Call FSUIPC_Write(&HB6E, 1, VarPtr(FailOn), dwResult)
-            Call FSUIPC_Write(&H3BE7, 1, VarPtr(FailOn), dwResult)
-                    
-        Case "PitotHeat"
-            Call FSUIPC_Write(&HB71, 1, VarPtr(FailOn), dwResult)
-            Call FSUIPC_Write(&H3BE3, 1, VarPtr(FailOn), dwResult)
-
-        Case "Flaps"
-            MultiFailures = MultiFailures Or 1
-            Call FSUIPC_Write(&H32F8, 1, VarPtr(MultiFailures), dwResult)
-        
-        Case "Spoilers"
-            MultiFailures = MultiFailures Or 2
-            Call FSUIPC_Write(&H32F8, 1, VarPtr(MultiFailures), dwResult)
-        
-        Case "Gear"
-            MultiFailures = MultiFailures Or 4
-            Call FSUIPC_Write(&H32F8, 1, VarPtr(MultiFailures), dwResult)
-        
-        Case "Engine"
-            EngineFailures = EngineFailures Or CInt(2 ^ engine)
-            fuelCtl.ID = KEY_TOGGLE_FUEL_VALVE_ENG1 + engine
-            fuelCtl.value = 1
-            Call FSUIPC_Write(&HB6B, 1, VarPtr(EngineFailures), dwResult)
-            Call FSUIPC_Write(&H890 + (engine * &H98), 2, VarPtr(FuelCutoff), dwResult)
-            Call FSUIPC_Write(&H892 + (engine * &H98), 2, VarPtr(FuelCutoff), dwResult)
-            Call FSUIPC_Write(&H3590 + (engine * 4), 2, VarPtr(FuelCutoff), dwResult)
-            Call FSUIPC_Write(&H3110, 8, VarPtr(fuelCtl), dwResult)
-        
-        Case "Rev"
-            MultiFailures = MultiFailures Or CInt(2 ^ (engine + 4))
-            Call FSUIPC_Write(&H32F8, 1, VarPtr(MultiFailures), dwResult)
-        
-        Case Else
-            ShowMessage "Unknown Failure Type - " & FailureType, ACARSERRORCOLOR
-            Exit Sub
-    
-    End Select
-    
-    'Do the FSUIPC call
-    If Not FSUIPC_Process(dwResult) Then
-        ShowMessage "Error setting Failure", ACARSERRORCOLOR
-    ElseIf Not config.FailuresSilent Then
-        ShowMessage "SYSTEM FAILURE - " & FailureType, ACARSERRORCOLOR
-        PlaySoundFile "notify_failure.wav"
-    End If
+    'Write to FSUIPC
+    Call FSUIPC_Write(&H262, 2, VarPtr(doPause), lngResult)
+    Call FSUIPC_Write(&H3110, 8, VarPtr(pCtl), lngResult)
+    If Not FSUIPC_Process(lngResult) Then ShowMessage "Error setting Pause status", ACARSERRORCOLOR
 End Sub
 
 Public Function SetParkBrake() As Boolean

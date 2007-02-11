@@ -148,11 +148,11 @@ Private Sub cboChart_Click()
     
     'DEBUG REDIRECTION
     hostName = config.ACARSHost
-    If (hostName = "polaris.sce.net") Then hostName = "dva2006.deltava.org"
+    If (Right(hostName, 7) = "sce.net") Then hostName = "dva2006.deltava.org"
     
     'Fire up the web browser
-    brwChart.Navigate "http://" + frmMain.txtPilotID.Text + ":" + frmMain.txtPassword.Text + "@" + _
-        hostName + "/charts/0x" + Hex(chartID)
+    brwChart.Navigate "http://" + frmMain.txtPilotID.Text + ":" + frmMain.txtPassword.Text + _
+        "@" + hostName + "/charts/0x" + Hex(chartID)
     ShowMessage "Loading Approach Chart " + ApproachCharts.ChartNames(cboChart.ListIndex) + _
         " for " + ApproachCharts.AirportCode, ACARSTEXTCOLOR
 End Sub
@@ -160,3 +160,4 @@ End Sub
 Private Sub cmdPrint_Click()
     brwChart.ExecWB OLECMDID_PRINT, OLECMDEXECOPT_PROMPTUSER
 End Sub
+

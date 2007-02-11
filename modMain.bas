@@ -191,35 +191,23 @@ Public Sub ApplicationStartup()
             
                 'Load aircraft info
                 Set acInfo = GetAircraftInfo()
+                acInfo.BaseAGL = oldFlight.AircraftAGL
             Else
-                If info.TestFlight Then
-                    MsgBox "ACARS has loaded your old Flight Data, and you can export it to Microsoft " & _
-                        "Excel and Google Earth.", vbOKOnly + vbInformation, "Flight Restored"
-                Else
-                    MsgBox "ACARS has loaded your old Flight Data, and has enough information to file" & _
-                      vbCrLf & "a Flight Report. Please connect to the ACARS server to file your PIREP.", _
-                      vbOKOnly + vbInformation, "Flight Restored"
-                End If
+                MsgBox "ACARS has loaded your old Flight Data, and has enough information to file" & _
+                    vbCrLf & "a Flight Report. Please connect to the ACARS server to file your PIREP.", _
+                    vbOKOnly + vbInformation, "Flight Restored"
             End If
             
             'Reset button states
             With frmMain
                 .LockFlightInfo False
-                .chkCheckRide.Enabled = Not info.TestFlight
-                .chkTrainFlight.Enabled = Not info.CheckRide
+                .chkCheckRide.Enabled = True
                 .tmrPosUpdates.Enabled = info.InFlight
                 .tmrFlightTime.Enabled = info.InFlight
                 .tmrStartCheck.Enabled = False
                 .cmdPIREP.visible = True
-                If info.TestFlight Then
-                    .cmdPIREP.Enabled = info.FlightData
-                    .cmdPIREP.Caption = "Export Data"
-                    .chkTrainFlight.value = 1
-                    .chkTrainFlight.Enabled = False
-                Else
-                    .cmdPIREP.Enabled = info.FlightData And config.ACARSConnected
-                    If info.CheckRide Then .chkCheckRide.value = 1
-                End If
+                .cmdPIREP.Enabled = info.FlightData And config.ACARSConnected
+                If info.CheckRide Then .chkCheckRide.value = 1
             End With
         Else
             'Prompt if the user wants to delete the flight
@@ -234,7 +222,7 @@ Public Sub ApplicationStartup()
     'Update settings
     frmSplash.SetProgressLabel "Loading airport/equipment options"
     SetComboChoices frmMain.cboEquipment, config.EquipmentTypes, info.EquipmentType, "-"
-    SetComboChoices frmMain.cboAirline, config.AirlineNames, info.Airline.Name, "-"
+    SetComboChoices frmMain.cboAirline, config.AirlineNames, info.Airline.name, "-"
     SetAirport frmMain.cboAirportD, config.AirportNames, info.airportD
     SetAirport frmMain.cboAirportA, config.AirportNames, info.AirportA
     SetAirport frmMain.cboAirportL, config.AirportNames, info.AirportL
@@ -268,12 +256,6 @@ Public Sub ApplicationStartup()
         End If
     End With
     
-    'If we do not have a flight but FS is running, go into Cold & Dark mode
-    If (oldFlight Is Nothing) And config.FSUIPCConnected And config.ColdDark Then
-        frmSplash.SetProgressLabel "Setting Cold and Dark Cockpit"
-        ColdDarkCockpit True
-    End If
-    
     'Pause for 2 seconds
     frmSplash.ClearProgressLabel
     If (oldFlight Is Nothing) Then
@@ -290,7 +272,7 @@ Public Sub ApplicationStartup()
         .txtCmd.SetFocus
         .MousePointer = vbDefault
         .SSTab1.TabVisible(3) = config.ShowDebug
-        .chkStealth.Enabled = config.HasRole("HR")
+        .chkStealth.Enabled = config.HasRole("HR") And Not config.NoInternet
         .chkStealth.visible = config.HasRole("HR")
         If config.FSUIPCConnected Then .tmrStartCheck.Enabled = True
     End With
@@ -299,13 +281,8 @@ End Sub
 Public Function ConfirmExit() As Boolean
     ConfirmExit = True
     If info.FlightData And Not info.PIREPFiled Then
-        If info.TestFlight Then
-            ConfirmExit = (MsgBox("You have not saved your flight data from this Training Flight. " & _
-                "Are you sure you want to exit?", vbYesNo Or vbQuestion, "Confirm Exit") = vbYes)
-        Else
-            ConfirmExit = (MsgBox("You have not filed a Flight Report for your flight. " & _
-                "Are you sure you want to exit?", vbYesNo Or vbQuestion, "Confirm") = vbYes)
-        End If
+        ConfirmExit = (MsgBox("You have not filed a Flight Report for your flight. " & _
+            "Are you sure you want to exit?", vbYesNo Or vbQuestion, "Confirm") = vbYes)
         
         If Not ConfirmExit Then Exit Function
     End If
@@ -523,7 +500,7 @@ Public Sub SetAirport(combo As ComboBox, choices As Variant, ap As Airport)
     If (ap Is Nothing) Then
         SetComboChoices combo, choices, "-", "-"
     Else
-        SetComboChoices combo, choices, ap.Name + " (" + ap.ICAO + ")", "-"
+        SetComboChoices combo, choices, ap.name + " (" + ap.ICAO + ")", "-"
     End If
 End Sub
 
@@ -553,11 +530,11 @@ Public Sub SetComboChoices(combo As ComboBox, choices As Variant, Optional newVa
     If (combo.ListIndex = -1) Then combo.ListIndex = 0
 End Sub
 
-Public Sub PlaySoundFile(Name As String)
+Public Sub PlaySoundFile(name As String)
     Dim fName As String
     
     'Check that the file exists
-    fName = App.path + "\" + Name
+    fName = App.path + "\" + name
     If (Dir(fName) <> "") Then
         PlaySound fName, 0, SND_ASYNC And SND_FILENAME
     Else

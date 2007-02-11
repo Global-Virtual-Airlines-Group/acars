@@ -38,14 +38,6 @@ Private aLines As Variant
 Private eqTypes As Variant
 Private airportInfo As Variant
 
-'Failure mode support
-Public FailuresEnabled As Boolean
-Public FailuresSilent As Boolean
-Public FailureConfig As Failures
-
-'Cold and Dark support
-Public ColdDark As Boolean
-
 'Flight state data
 Public FSUIPCConnected As Boolean
 Public ACARSConnected As Boolean
@@ -69,7 +61,11 @@ Public HideMessagesWhenBusy As Boolean
 Public SterileCockpit As Boolean
 Public GaugeSupport As Boolean
 Public FreezeWindow As Boolean
+Public CrashDetect As Boolean
 Public DisableAutoSave As Boolean
+
+'Offline PIREP Submission fields
+Public NoInternet As Boolean
 
 'Security roles
 Private Roles As Variant
@@ -95,6 +91,9 @@ Public Busy As Boolean
 
 'Saved flights folder
 Public SavedFlightsPath As String
+
+'Override busy message
+Public BusyMessage As String
 
 Private FS9Data As String
 Private ForceCfgUpdate As Boolean
@@ -159,45 +158,15 @@ Public Sub Class_Initialize()
     SterileCockpit = RegReadBoolean(HKCU, REG_SETTINGS_KEY, "SterileCockpit", False)
     PlaySound = RegReadBoolean(HKLM, REG_SETTINGS_KEY, "PlaySoundForChat", True)
     FlyOffline = RegReadBoolean(HKLM, REG_SETTINGS_KEY, "FlyOffline", False)
+    NoInternet = RegReadBoolean(HKLM, REG_SETTINGS_KEY, "NoInternet", False)
     GaugeSupport = RegReadBoolean(HKLM, REG_SETTINGS_KEY, "GaugeIntegration", False)
     FreezeWindow = RegReadBoolean(HKCU, REG_SETTINGS_KEY, "FreezeWindow", False)
     ShowTimestamps = RegReadBoolean(HKLM, REG_SETTINGS_KEY, "ShowTimestamps", True)
     DisableAutoSave = RegReadBoolean(HKCU, REG_SETTINGS_KEY, "DisableAutoSave", False)
+    CrashDetect = RegReadBoolean(HKCU, REG_SETTINGS_KEY, "CrashDetect", False)
     ShowDebug = RegReadBoolean(HKLM, REG_SETTINGS_KEY, "ShowDebug", False)
     WideFSInstalled = RegReadBoolean(HKLM, REG_SETTINGS_KEY, "WideFS", False)
-    FailuresEnabled = RegReadBoolean(HKCU, REG_SETTINGS_KEY, "Failures", False)
-    FailuresSilent = RegReadBoolean(HKCU, REG_SETTINGS_KEY, "SilentFailure", False)
-    ColdDark = RegReadBoolean(HKCU, REG_SETTINGS_KEY, "ColdDark", False)
     SB3Support = RegReadBoolean(HKLM, REG_SETTINGS_KEY, "SB3Support", False) And (SB3Installed Or WideFSInstalled)
-    
-    'Load Failure options
-    Set FailureConfig = New Failures
-    FailureConfig.InstrumentFailureProbability = RegReadDWORD(HKCU, FAIL_SETTINGS_KEY, "InstProbability", 0)
-    FailureConfig.EquipmentFailureProbability = RegReadDWORD(HKCU, FAIL_SETTINGS_KEY, "EQProbability", 0)
-    FailureConfig.ADF = RegReadBoolean(HKCU, FAIL_SETTINGS_KEY, "ADF", False)
-    FailureConfig.Airspeed = RegReadBoolean(HKCU, FAIL_SETTINGS_KEY, "Airspeed", False)
-    FailureConfig.Altimeter = RegReadBoolean(HKCU, FAIL_SETTINGS_KEY, "Altimeter", False)
-    FailureConfig.Attitude = RegReadBoolean(HKCU, FAIL_SETTINGS_KEY, "Attitude", False)
-    FailureConfig.COM1 = RegReadBoolean(HKCU, FAIL_SETTINGS_KEY, "COM1", False)
-    FailureConfig.COM2 = RegReadBoolean(HKCU, FAIL_SETTINGS_KEY, "COM2", False)
-    FailureConfig.Compass = RegReadBoolean(HKCU, FAIL_SETTINGS_KEY, "Compass", False)
-    FailureConfig.Fuel = RegReadBoolean(HKCU, FAIL_SETTINGS_KEY, "Fuel", False)
-    FailureConfig.NAV1 = RegReadBoolean(HKCU, FAIL_SETTINGS_KEY, "NAV1", False)
-    FailureConfig.NAV2 = RegReadBoolean(HKCU, FAIL_SETTINGS_KEY, "NAV2", False)
-    FailureConfig.Transponder = RegReadBoolean(HKCU, FAIL_SETTINGS_KEY, "Transponder", False)
-    FailureConfig.VerticalSpeed = RegReadBoolean(HKCU, FAIL_SETTINGS_KEY, "VSI", False)
-    FailureConfig.Flaps = RegReadBoolean(HKCU, FAIL_SETTINGS_KEY, "Flaps", False)
-    FailureConfig.Spoilers = RegReadBoolean(HKCU, FAIL_SETTINGS_KEY, "Spoilers", False)
-    FailureConfig.Gear = RegReadBoolean(HKCU, FAIL_SETTINGS_KEY, "Gear", False)
-    FailureConfig.PitotHeat = RegReadBoolean(HKCU, FAIL_SETTINGS_KEY, "PitotHeat", False)
-    FailureConfig.SetEngineFailure 1, RegReadBoolean(HKCU, FAIL_SETTINGS_KEY, "Engine1", False)
-    FailureConfig.SetEngineFailure 2, RegReadBoolean(HKCU, FAIL_SETTINGS_KEY, "Engine2", False)
-    FailureConfig.SetEngineFailure 3, RegReadBoolean(HKCU, FAIL_SETTINGS_KEY, "Engine3", False)
-    FailureConfig.SetEngineFailure 4, RegReadBoolean(HKCU, FAIL_SETTINGS_KEY, "Engine4", False)
-    FailureConfig.SetReverserFailure 1, RegReadBoolean(HKCU, FAIL_SETTINGS_KEY, "Rev1", False)
-    FailureConfig.SetReverserFailure 2, RegReadBoolean(HKCU, FAIL_SETTINGS_KEY, "Rev2", False)
-    FailureConfig.SetReverserFailure 3, RegReadBoolean(HKCU, FAIL_SETTINGS_KEY, "Rev3", False)
-    FailureConfig.SetReverserFailure 4, RegReadBoolean(HKCU, FAIL_SETTINGS_KEY, "Rev4", False)
 End Sub
 
 Property Get IsFS9() As Boolean
@@ -228,6 +197,7 @@ End Property
 Public Sub UpdateSettingsMenu()
     With frmMain
         .mnuOptionsFlyOffline.Checked = FlyOffline
+        .mnuOptionsNoInternet.Checked = NoInternet
         .mnuCOMPlaySoundForChat.Checked = PlaySound
         .mnuOptionsSavePassword.Checked = SavePassword
         .mnuCOMShowTimestamps.Checked = ShowTimestamps
@@ -235,17 +205,22 @@ Public Sub UpdateSettingsMenu()
         .mnuOptionsGaugeIntegration.Checked = GaugeSupport
         .mnuOptionsShowDebugMessages.Checked = ShowDebug
         .mnuOptionsHide.Checked = HideWhenMinimized
-        .mnuOptionsColdDark.Checked = ColdDark
         .mnuCOMHideBusy.Checked = HideMessagesWhenBusy
         .mnuCOMFreezeWindow.Checked = FreezeWindow
         .mnuCOMSterileCockpit.Checked = SterileCockpit
+        .mnuOptionsCrashDetect.Checked = CrashDetect
         .mnuOptionsSB3Support.Enabled = SB3Installed Or WideFSInstalled
         .mnuOptionsSB3Support.Checked = SB3Support
         .mnuOptionsWideFS.Checked = WideFSInstalled
         .mnuOptionsDisableAutoSave.Checked = DisableAutoSave
-        .mnuFailuresEnabled.Checked = FailuresEnabled
-        .mnuFailuresSilent.Checked = FailuresSilent
-        .mnuFailures.Enabled = info.TestFlight
+        
+        'Disable connect button
+        .cmdConnectDisconnect.Enabled = Not NoInternet
+        If Not ACARSConnected Then
+            .txtPilotID.Enabled = Not NoInternet
+            .txtPassword.Enabled = Not NoInternet
+            .chkStealth.Enabled = Not NoInternet
+        End If
         
         'Update SB3 support
         .mnuSaveFlightPlan.Enabled = SB3Support
@@ -265,7 +240,6 @@ Public Sub UpdateFlightInfo()
     frmMain.cboAirportA.ListIndex = GetAirportOfs(info.AirportA) + 1
     frmMain.cboAirportL.ListIndex = GetAirportOfs(info.AirportL) + 1
     If info.CheckRide Then frmMain.chkCheckRide.value = 1
-    If info.TestFlight Then frmMain.chkTrainFlight.value = 1
     
     'Set equipment type
     With frmMain.cboEquipment
@@ -291,6 +265,7 @@ Public Sub Save()
     RegWriteBoolean HKLM, REG_SETTINGS_KEY, "PlaySoundForChat", PlaySound
     RegWriteBoolean HKLM, REG_SETTINGS_KEY, "GaugeIntegration", GaugeSupport
     RegWriteBoolean HKLM, REG_SETTINGS_KEY, "FlyOffline", FlyOffline
+    RegWriteBoolean HKLM, REG_SETTINGS_KEY, "NoInternet", NoInternet
     RegWriteBoolean HKLM, REG_SETTINGS_KEY, "ShowTimestamps", ShowTimestamps
     RegWriteBoolean HKCU, REG_SETTINGS_KEY, "FreezeWindow", FreezeWindow
     RegWriteBoolean HKLM, REG_SETTINGS_KEY, "ShowDebug", ShowDebug
@@ -298,43 +273,9 @@ Public Sub Save()
     RegWriteBoolean HKCU, REG_SETTINGS_KEY, "HideMessagesWhenBusy", HideMessagesWhenBusy
     RegWriteBoolean HKCU, REG_SETTINGS_KEY, "SterileCockpit", SterileCockpit
     RegWriteBoolean HKCU, REG_SETTINGS_KEY, "DisableAutoSave", DisableAutoSave
+    RegWriteBoolean HKCU, REG_SETTINGS_KEY, "CrashDetect", CrashDetect
     RegWriteBoolean HKLM, REG_SETTINGS_KEY, "WideFS", WideFSInstalled
     RegWriteBoolean HKLM, REG_SETTINGS_KEY, "SB3Support", SB3Support
-    RegWriteBoolean HKCU, REG_SETTINGS_KEY, "ColdDark", ColdDark
-    
-    'Write failure settings
-    RegWriteBoolean HKCU, REG_SETTINGS_KEY, "Failures", FailuresEnabled
-    RegWriteBoolean HKCU, REG_SETTINGS_KEY, "SilentFailure", FailuresSilent
-    RegWriteDWORD HKCU, FAIL_SETTINGS_KEY, "MaxFailures", FailureConfig.MaxFailures
-    RegWriteDWORD HKCU, FAIL_SETTINGS_KEY, "InstProbability", FailureConfig.InstrumentFailureProbability
-    RegWriteDWORD HKCU, FAIL_SETTINGS_KEY, "EQProbability", FailureConfig.EquipmentFailureProbability
-    
-    'Write Failure configuration settings
-    RegWriteBoolean HKCU, FAIL_SETTINGS_KEY, "ADF", FailureConfig.ADF
-    RegWriteBoolean HKCU, FAIL_SETTINGS_KEY, "Airspeed", FailureConfig.Airspeed
-    RegWriteBoolean HKCU, FAIL_SETTINGS_KEY, "Altimeter", FailureConfig.Altimeter
-    RegWriteBoolean HKCU, FAIL_SETTINGS_KEY, "Attitude", FailureConfig.Attitude
-    RegWriteBoolean HKCU, FAIL_SETTINGS_KEY, "COM1", FailureConfig.COM1
-    RegWriteBoolean HKCU, FAIL_SETTINGS_KEY, "COM2", FailureConfig.COM2
-    RegWriteBoolean HKCU, FAIL_SETTINGS_KEY, "Compass", FailureConfig.Compass
-    RegWriteBoolean HKCU, FAIL_SETTINGS_KEY, "Fuel", FailureConfig.Fuel
-    RegWriteBoolean HKCU, FAIL_SETTINGS_KEY, "NAV1", FailureConfig.NAV1
-    RegWriteBoolean HKCU, FAIL_SETTINGS_KEY, "NAV2", FailureConfig.NAV2
-    RegWriteBoolean HKCU, FAIL_SETTINGS_KEY, "Transponder", FailureConfig.Transponder
-    RegWriteBoolean HKCU, FAIL_SETTINGS_KEY, "VSI", FailureConfig.VerticalSpeed
-    
-    RegWriteBoolean HKCU, FAIL_SETTINGS_KEY, "Flaps", FailureConfig.Flaps
-    RegWriteBoolean HKCU, FAIL_SETTINGS_KEY, "Spoilers", FailureConfig.Spoilers
-    RegWriteBoolean HKCU, FAIL_SETTINGS_KEY, "Gear", FailureConfig.Gear
-    RegWriteBoolean HKCU, FAIL_SETTINGS_KEY, "PitotHeat", FailureConfig.PitotHeat
-    RegWriteBoolean HKCU, FAIL_SETTINGS_KEY, "Engine1", FailureConfig.EngineFailure(1)
-    RegWriteBoolean HKCU, FAIL_SETTINGS_KEY, "Engine2", FailureConfig.EngineFailure(2)
-    RegWriteBoolean HKCU, FAIL_SETTINGS_KEY, "Engine3", FailureConfig.EngineFailure(3)
-    RegWriteBoolean HKCU, FAIL_SETTINGS_KEY, "Engine4", FailureConfig.EngineFailure(4)
-    RegWriteBoolean HKCU, FAIL_SETTINGS_KEY, "Rev1", FailureConfig.ReverserFailure(1)
-    RegWriteBoolean HKCU, FAIL_SETTINGS_KEY, "Rev2", FailureConfig.ReverserFailure(2)
-    RegWriteBoolean HKCU, FAIL_SETTINGS_KEY, "Rev3", FailureConfig.ReverserFailure(3)
-    RegWriteBoolean HKCU, FAIL_SETTINGS_KEY, "Rev4", FailureConfig.ReverserFailure(4)
 End Sub
 
 Property Get ACARSHost() As String
@@ -476,7 +417,7 @@ Public Function IsConfigUpToDate() As Boolean
     'Calculate average age of the data files
     apDate = FileDateTime(App.path + "\" + AIRPORT_DATA)
     eqDate = FileDateTime(App.path + "\" + EQ_DATA)
-    age = (DateDiff("d", apDate, Now) + DateDiff("d", eqDate, Now)) / 2
+    age = (DateDiff("d", apDate, now) + DateDiff("d", eqDate, now)) / 2
     
     IsConfigUpToDate = (age <= 21)
     

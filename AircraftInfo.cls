@@ -19,8 +19,6 @@ Public LDS767 As Boolean
 Public Payne7X7 As Boolean
 
 Public ZeroFuelWeight As Long
-Public MaxGrossWeight As Long
-
 Public HasAfterburner As Boolean
 Private acAGL As Integer
 
@@ -29,7 +27,6 @@ Private airP As String
 Private airF As String
 
 Public code As String
-Public FuelProfile As String
 
 'Aircraft parameters
 Public FuelWeight As Double

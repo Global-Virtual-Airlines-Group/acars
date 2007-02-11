@@ -16,6 +16,8 @@ Option Explicit
 Public FlightInfo As FlightData
 Public XML As String
 
+Public AircraftAGL As Integer
+
 Private posData As New OfflinePositionData
 
 Property Get FlightID() As Integer
@@ -31,7 +33,7 @@ Public Sub AddPosition(cPos As PositionData)
 End Sub
 
 Property Get Positions() As Variant
-    Positions = posData.queue
+    Positions = posData.Queue
 End Property
 
 Property Get HasData() As Boolean

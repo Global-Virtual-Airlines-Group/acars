@@ -42,7 +42,7 @@ End Sub
 Public Sub Receive(ByVal ID As Long)
     Dim x As Integer
     
-    If HasReceived(ID) Or Not IsWaitingFor(ID) Then Exit Sub
+    If (ID = 0) Or HasReceived(ID) Or Not IsWaitingFor(ID) Then Exit Sub
     
     'Add to the received Queue
     ReDim Preserve ReceivedIDs(UBound(ReceivedIDs) + 1)

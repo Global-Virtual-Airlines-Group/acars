@@ -7,7 +7,7 @@ Private Const HASH_SALT = "***REMOVED***"
 Private xdoc As DOMDocument
 Private root As IXMLDOMElement
 
-Public Sub PersistFlightData(Optional writeMsg As Boolean = False)
+Public Sub PersistFlightData(ByVal writeMsg As Boolean, Optional fName As String = "ACARS Flight")
     Dim fNum As Integer
     Dim fRoot As String
     Dim xmlData As String, shaData As String
@@ -20,13 +20,14 @@ Public Sub PersistFlightData(Optional writeMsg As Boolean = False)
     
     'Create the DOM document if it doesn't exist
     If (xdoc Is Nothing) Then
-        Dim saveTime As New UTCDate
+        Dim SaveTime As New UTCDate
     
-        saveTime.LocalTime = Now
+        SaveTime.SetNow
         Set xdoc = New DOMDocument
         Set root = xdoc.createNode(NODE_ELEMENT, "flight", "")
-        root.setAttribute "created", FormatDateTime(saveTime.UTCTime, "mm/dd/yyyy hh:nn:ss")
+        root.setAttribute "created", I18nOutputDateTime(SaveTime)
         root.setAttribute "build", CStr(App.Revision)
+        AddXMLField root, "aircraftAGL", CStr(acInfo.BaseAGL), False
         xdoc.appendChild root
     End If
     
@@ -44,37 +45,43 @@ Public Sub PersistFlightData(Optional writeMsg As Boolean = False)
     AddXMLField inf, "equipment", info.EquipmentType, False
     AddXMLField inf, "altitude", info.CruiseAltitude, False
     AddXMLField inf, "airportD", info.airportD.IATA, False
+    AddXMLField inf, "airportDName", info.airportD.name, False
     AddXMLField inf, "airportA", info.AirportA.IATA, False
-    If Not (info.AirportL Is Nothing) Then AddXMLField inf, "airportL", info.AirportL.IATA, False
+    AddXMLField inf, "airportAName", info.AirportA.name, False
+    If Not (info.AirportL Is Nothing) Then
+        AddXMLField inf, "airportL", info.AirportL.IATA, False
+        AddXMLField inf, "airportLName", info.AirportL.name, False
+    End If
+        
     AddXMLField inf, "route", info.Route
     AddXMLField inf, "remarks", info.Remarks
     AddXMLField inf, "network", info.Network, False
-    AddXMLField inf, "startTime", FormatDateTime(info.StartTime.UTCTime, "mm/dd/yyyy hh:nn:ss")
+    AddXMLField inf, "startTime", I18nOutputDateTime(info.StartTime)
     AddXMLField inf, "fs_ver", CStr(info.FSVersion), False
+    If info.ScheduleVerified Then AddXMLField inf, "schedOK", "true", False
     If info.Offline Then AddXMLField inf, "offline", "true", False
     If (info.FlightPhase = COMPLETE) Then AddXMLField inf, "complete", "true", False
     If info.CheckRide Then AddXMLField inf, "checkRide", "true", False
-    If info.TestFlight Then AddXMLField inf, "trainFlight", "true", False
     
     'Some of these fields may be zero but they should be persisted anyways
-    AddXMLField inf, "taxiOutTime", FormatDateTime(info.TaxiOutTime.UTCTime, "mm/dd/yyyy hh:nn:ss")
+    AddXMLField inf, "taxiOutTime", I18nOutputDateTime(info.TaxiOutTime)
     AddXMLField inf, "taxiFuel", CStr(info.TaxiFuel), False
     AddXMLField inf, "taxiWeight", CStr(info.TaxiWeight), False
-    AddXMLField inf, "takeoffTime", FormatDateTime(info.TakeoffTime.UTCTime, "mm/dd/yyyy hh:nn:ss")
+    AddXMLField inf, "takeoffTime", I18nOutputDateTime(info.TakeoffTime)
     AddXMLField inf, "takeoffFuel", CStr(info.TakeoffFuel), False
     AddXMLField inf, "takeoffWeight", CStr(info.TakeoffWeight), False
     AddXMLField inf, "takeoffN1", FormatNumber(info.TakeoffN1, "##0.0"), False
     AddXMLField inf, "takeoffSpeed", CStr(info.TakeoffSpeed), False
-    AddXMLField inf, "landingTime", FormatDateTime(info.LandingTime.UTCTime, "mm/dd/yyyy hh:nn:ss")
+    AddXMLField inf, "landingTime", I18nOutputDateTime(info.LandingTime)
     AddXMLField inf, "landingFuel", CStr(info.LandingFuel), False
     AddXMLField inf, "landingWeight", CStr(info.LandingWeight), False
     AddXMLField inf, "landingN1", FormatNumber(info.LandingN1, "##0.0"), False
     AddXMLField inf, "landingSpeed", CStr(info.LandingSpeed), False
     AddXMLField inf, "landingVSpeed", CStr(info.LandingVSpeed), False
-    AddXMLField inf, "gateTime", FormatDateTime(info.GateTime.UTCTime, "mm/dd/yyyy hh:nn:ss")
+    AddXMLField inf, "gateTime", I18nOutputDateTime(info.GateTime)
     AddXMLField inf, "gateFuel", CStr(info.GateFuel), False
     AddXMLField inf, "gateWeight", CStr(info.GateWeight), False
-    AddXMLField inf, "shutdownTime", FormatDateTime(info.ShutdownTime.UTCTime, "mm/dd/yyyy hh:nn:ss")
+    AddXMLField inf, "shutdownTime", I18nOutputDateTime(info.ShutdownTime)
     AddXMLField inf, "shutdownFuel", CStr(info.ShutdownFuel), False
     AddXMLField inf, "shutdownWeight", CStr(info.ShutdownWeight), False
     AddXMLField inf, "time0X", CStr(info.TimePaused), False
@@ -133,7 +140,7 @@ Public Sub PersistFlightData(Optional writeMsg As Boolean = False)
             AddXMLField e, "wHdg", CStr(cPos.WindHeading), False
             AddXMLField e, "wSpeed", CStr(cPos.WindSpeed), False
             AddXMLField e, "frameRate", CStr(cPos.FrameRate), False
-            AddXMLField e, "date", FormatDateTime(cPos.DateTime.UTCTime, "mm/dd/yyyy hh:nn:ss")
+            AddXMLField e, "date", I18nOutputDateTime(cPos.DateTime)
             AddXMLField e, "flags", CStr(cPos.Flags), False
 
             'Add to the positions
@@ -151,7 +158,7 @@ Public Sub PersistFlightData(Optional writeMsg As Boolean = False)
     
     'Write the XML to a file
     fNum = FreeFile()
-    fRoot = App.path + "\" + "ACARS Flight " + SavedFlightID(info)
+    fRoot = App.path + "\" + fName + " " + SavedFlightID(info)
     Open fRoot + ".xml" For Output As fNum
     Print #fNum, xmlData
     Close #fNum
@@ -267,6 +274,7 @@ Public Function RestoreFlightData(ByVal flightCode As String) As SavedFlight
     'Load the flight information
     If config.ShowDebug Then ShowMessage "Restoring Flight Information", DEBUGTEXTCOLOR
     Set result.FlightInfo = New FlightData
+    result.AircraftAGL = CInt(getChild(root, "aircrafAGL", "5"))
     With result.FlightInfo
         .FlightID = CLng(getChild(inf, "id", "0"))
         Set .Airline = config.GetAirline(getChild(inf, "airline", ""))
@@ -277,34 +285,34 @@ Public Function RestoreFlightData(ByVal flightCode As String) As SavedFlight
         .CruiseAltitude = getChild(inf, "altitude", "3000")
         .Network = getChild(inf, "network", "Offline")
         .CheckRide = CBool(getChild(inf, "checkRide", "false"))
-        .TestFlight = CBool(getChild(inf, "trainFlight", "false"))
+        .ScheduleVerified = CBool(getChild(inf, "schedOK", "false"))
         Set .airportD = config.GetAirport(getChild(inf, "airportD", ""))
         Set .AirportA = config.GetAirport(getChild(inf, "airportA", ""))
         Set .AirportL = config.GetAirport(getChild(inf, "airportL", ""))
         .Route = getChild(inf, "route", "")
         .Remarks = getChild(inf, "remarks", "")
         .FSVersion = CInt(getChild(inf, "fs_ver", "7"))
-        .StartTime.UTCTime = ParseDateTime(getChild(inf, "startTime", ""))
-        .TaxiOutTime.UTCTime = ParseDateTime(getChild(inf, "taxiOutTime", ""))
+        .StartTime.ParseUTCTime = I18nDateTime(getChild(inf, "startTime", ""))
+        .TaxiOutTime.ParseUTCTime = I18nDateTime(getChild(inf, "taxiOutTime", ""))
         .TaxiFuel = CLng(getChild(inf, "taxiFuel", "0"))
         .TaxiWeight = CLng(getChild(inf, "taxiWeight", "0"))
-        .TakeoffTime.UTCTime = ParseDateTime(getChild(inf, "takeoffTime", ""))
+        .TakeoffTime.ParseUTCTime = I18nDateTime(getChild(inf, "takeoffTime", ""))
         .TakeoffFuel = CLng(getChild(inf, "takeoffFuel", "0"))
         .TakeoffWeight = CLng(getChild(inf, "takeoffWeight", "0"))
         .TakeoffN1 = CDbl(getChild(inf, "takeoffN1", "00.0"))
         .TakeoffSpeed = CInt(getChild(inf, "takeoffSpeed", "0"))
-        .LandingTime.UTCTime = ParseDateTime(getChild(inf, "landingTime", ""))
+        .LandingTime.ParseUTCTime = I18nDateTime(getChild(inf, "landingTime", ""))
         .LandingFuel = CLng(getChild(inf, "landingFuel", "0"))
         .LandingWeight = CLng(getChild(inf, "landingWeight", "0"))
         .LandingN1 = CDbl(getChild(inf, "landingN1", "00.0"))
         .LandingSpeed = CInt(getChild(inf, "landingSpeed", "0"))
         .LandingVSpeed = CInt(getChild(inf, "landingVSpeed", "0"))
-        .GateTime.UTCTime = ParseDateTime(getChild(inf, "gateTime", ""))
-        If (Year(.GateTime.UTCTime) < 2000) Then .GateTime.UTCTime = .LandingTime.UTCTime
+        .GateTime.ParseUTCTime = I18nDateTime(getChild(inf, "gateTime", ""))
+        If (Year(.GateTime.UTCTime) < 2000) Then .GateTime.Clone (.LandingTime)
         .GateFuel = CLng(getChild(inf, "gateFuel", "0"))
         .GateWeight = CLng(getChild(inf, "gateWeight", "0"))
-        .ShutdownTime.UTCTime = ParseDateTime(getChild(inf, "shutdownTime", ""))
-        If (Year(.ShutdownTime.UTCTime) < 2000) Then .ShutdownTime.UTCTime = .LandingTime.UTCTime
+        .ShutdownTime.ParseUTCTime = I18nDateTime(getChild(inf, "shutdownTime", ""))
+        If (Year(.ShutdownTime.UTCTime) < 2000) Then .ShutdownTime.Clone (.LandingTime)
         .ShutdownFuel = CLng(getChild(inf, "shutdownFuel", "0"))
         .ShutdownWeight = CLng(getChild(inf, "shutdownWeight", "0"))
         .TimePaused = CLng(getChild(inf, "time0X", "0"))
@@ -361,7 +369,7 @@ Public Function RestoreFlightData(ByVal flightCode As String) As SavedFlight
             sPos.WindHeading = CInt(getChild(p, "wHdg", "0"))
             sPos.WindSpeed = CInt(getChild(p, "wSpeed", "0"))
             sPos.FrameRate = CInt(getChild(p, "frameRate", "0"))
-            sPos.DateTime.UTCTime = ParseDateTime(getChild(p, "date", CStr(Now)))
+            sPos.DateTime.ParseUTCTime = I18nDateTime(getChild(p, "date", CStr(Now)))
             
             'Build the flags
             Flags = CLng(getChild(p, "flags", "0"))

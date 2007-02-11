@@ -7,6 +7,7 @@ Public Const XMLRESPONSEROOT = "ACARSResponse"
 Public Function WaitForACK(ByVal ID As Long, Optional ByVal TimeOut As Long = 2500) As Boolean
     Dim gotACK As Boolean
     Dim totalTime As Long
+    Dim pingTime As Integer
     
     ACKStack.Queue ID
     
@@ -15,8 +16,16 @@ Public Function WaitForACK(ByVal ID As Long, Optional ByVal TimeOut As Long = 25
     While (totalTime < TimeOut) And Not gotACK
         gotACK = ACKStack.HasReceived(ID)
         If Not gotACK Then
-            totalTime = totalTime + 150
-            Sleep 150
+            totalTime = totalTime + 100
+            pingTime = pingTime + 100
+            If (pingTime >= 1000) Then
+                If config.ShowDebug Then ShowMessage "Pinging Socket", DEBUGTEXTCOLOR
+                SendPing
+                ReqStack.Send
+                pingTime = 0
+            End If
+            
+            Sleep 100
             DoEvents
         End If
     Wend
@@ -121,6 +130,9 @@ Private Sub ProcessACK(cmdNode As IXMLDOMNode)
         info.InfoReqID = SendFlightInfo(info)
         ReqStack.Send
     End If
+    
+    'If the ACK ID is zero, abort
+    If (ReqID = 0) Then Exit Sub
             
     'Do special things if we're responding to a message
     If ReqID = info.AuthReqID Then
@@ -181,6 +193,12 @@ Private Sub ProcessACK(cmdNode As IXMLDOMNode)
             ShowMessage "ACARS Messaging disabled", SYSMSGCOLOR
         End If
         
+        'Check our time offset
+        Dim timeOfs As Long
+        timeOfs = CLng(getChild(cmdNode, "timeOffset", "0"))
+        If (Abs(timeOfs) > 900) Then ShowMessage "Your System Clock is off by " & CStr(timeOfs) & _
+            " seconds!", ACARSERRORCOLOR
+        
         'Update Equipment/Airport comboboxes
         If Not config.IsConfigUpToDate Then
             ShowMessage "Updating Airport/Airline/Equipment lists", ACARSTEXTCOLOR
@@ -197,7 +215,7 @@ Private Sub ProcessACK(cmdNode As IXMLDOMNode)
         RequestPilotList
         
         'Get a flight ID if we have a flight
-        If (info.InFlight Or info.FlightData) And Not (info.TestFlight Or RequestInfo) Then info.InfoReqID = SendFlightInfo(info)
+        If (info.InFlight Or info.FlightData) And Not (RequestInfo) Then info.InfoReqID = SendFlightInfo(info)
         
         'Send data
         ReqStack.Send
@@ -267,7 +285,7 @@ Private Sub ProcessChatText(cmdNode As IXMLDOMNode)
     
     'Check if we are in sterile cockpit mode
     IsSterile = False
-    If ((info.FlightPhase = AIRBORNE) Or (info.FlightPhase = TAKEOFF)) Then
+    If ((info.FlightPhase = AIRBORNE) Or (info.FlightPhase = TAKEOFF) Or (info.FlightPhase = ROLLOUT)) Then
         If Not (pos Is Nothing) Then IsSterile = (pos.AltitudeMSL < 10000)
     End If
     
@@ -276,7 +294,7 @@ Private Sub ProcessChatText(cmdNode As IXMLDOMNode)
     msgText = getChild(cmdNode, "text", "")
     msgFrom = getChild(cmdNode, "from", "SYSTEM")
     If (msgFrom <> "SYSTEM") Then Set p = users.GetPilot(msgFrom)
-    If (Not (p Is Nothing) And config.ShowPilotNames) Then msgFrom = p.Name
+    If (Not (p Is Nothing) And config.ShowPilotNames) Then msgFrom = p.name
 
     'Check if there is a "To" element. If so, it's a private message.
     config.MsgReceived = True
@@ -300,7 +318,12 @@ Private Sub ProcessChatText(cmdNode As IXMLDOMNode)
         'Send a response if we are busy
         If Not (p Is Nothing) And (Left(msgText, 5) <> "AUTO:") Then
             If config.Busy Then
-                SendChat "AUTO: I am currently busy and not available to chat.", msgFrom
+                If (config.BusyMessage <> "") Then
+                    SendChat "AUTO: " & config.BusyMessage, msgFrom
+                Else
+                    SendChat "AUTO: I am currently busy and not available to chat.", msgFrom
+                End If
+                
                 ReqStack.Send
             ElseIf (config.SterileCockpit And IsSterile) Then
                 SendChat "AUTO: I am in a Sterile Cockpit environment and not available to chat.", msgFrom
@@ -318,19 +341,34 @@ Private Sub ProcessDataResponse(cmdNode As IXMLDOMNode)
     
     Dim pNodes As IXMLDOMNodeList
     Dim pNode As IXMLDOMNode
-    Dim ID As String
+    Dim ID As String, ReqID As Long
     Dim freq As String
     Dim Msg As String
     
     Dim p As Pilot
     Dim OldDispatch As Boolean, NewDispatch As Boolean
     
+    'Check if this is a response to a specific request
+    ReqID = Val("&H" + getAttr(cmdNode, "id", "0"))
+    If (ReqID <> 0) Then
+        ACKStack.Receive ReqID
+        If config.ShowDebug Then ShowMessage "Received ACK for " + Hex(ReqID), DEBUGTEXTCOLOR
+        
+        'Check if this is the schedule search request flag
+        If (ReqID = info.SchedReqID) Then
+            Set pNode = cmdNode.selectSingleNode("flights")
+            info.ScheduleVerified = (Not (pNode Is Nothing)) And (pNode.childNodes.Length > 0)
+            info.SchedReqID = 0
+            Exit Sub
+        End If
+    End If
+    
     'Branch based on response type
     Set rspNodes = cmdNode.selectNodes("rsptype")
     For Each rspNode In rspNodes
         Select Case LCase(rspNode.Text)
             Case "pilotlist"
-                Dim Name As String
+                Dim name As String
                 OldDispatch = users.DispatchOnline
                 
                 If config.ShowDebug Then ShowMessage "Updating Pilot List", DEBUGTEXTCOLOR
@@ -360,7 +398,7 @@ Private Sub ProcessDataResponse(cmdNode As IXMLDOMNode)
                     If (p.ID <> "") Then
                         users.AddPilot p
                         If (UCase(p.ID) = UCase(frmMain.txtPilotID.Text)) Then
-                            frmMain.txtPilotName.Text = p.Name
+                            frmMain.txtPilotName.Text = p.name
                             frmMain.txtPilotName.visible = True
                             frmMain.lblName.visible = True
                         End If
@@ -410,7 +448,7 @@ Private Sub ProcessDataResponse(cmdNode As IXMLDOMNode)
                     If (p.ID <> "") Then
                         Set oldPilot = users.GetPilot(p.ID)
                         users.AddPilot p
-                        If (oldPilot Is Nothing) Then ShowMessage p.Name + " (" + p.ID + _
+                        If (oldPilot Is Nothing) Then ShowMessage p.name + " (" + p.ID + _
                             ") logged into the ACARS server.", SYSMSGCOLOR
                     End If
                 Next
@@ -440,7 +478,7 @@ Private Sub ProcessDataResponse(cmdNode As IXMLDOMNode)
                     p.LastName = getChild(pNode, "lastname", "")
 
                     users.DeletePilot p.ID
-                    ShowMessage p.Name + " (" + p.ID + ") logged out from the ACARS server.", SYSMSGCOLOR
+                    ShowMessage p.name + " (" + p.ID + ") logged out from the ACARS server.", SYSMSGCOLOR
                 Next
                 
                 'Update the Pilot List
@@ -465,7 +503,7 @@ Private Sub ProcessDataResponse(cmdNode As IXMLDOMNode)
                     ctr.ID = getAttr(pNode, "code", "?")
                     ctr.NetworkID = getAttr(pNode, "networkID", "000000")
                     ctr.Frequency = getAttr(pNode, "freq", "199.98")
-                    ctr.Name = getAttr(pNode, "name", "???")
+                    ctr.name = getAttr(pNode, "name", "???")
                     ctr.Rating = getAttr(pNode, "rating", "Observer")
                     ctr.FacilityType = getAttr(pNode, "type", "Center")
                     
@@ -540,7 +578,7 @@ Private Sub ProcessDataResponse(cmdNode As IXMLDOMNode)
                         Set a = New Airport
                         a.ICAO = getAttr(pNode, "icao")
                         a.IATA = getAttr(pNode, "iata")
-                        a.Name = Replace(getAttr(pNode, "name", a.ICAO), ",", "")
+                        a.name = Replace(getAttr(pNode, "name", a.ICAO), ",", "")
                         a.Latitude = CDbl(Replace(getAttr(pNode, "lat", "0"), ".", config.DecimalSeparator))
                         a.Longitude = CDbl(Replace(getAttr(pNode, "lng", "0"), ".", config.DecimalSeparator))
                         config.AddAirport a
@@ -561,7 +599,7 @@ Private Sub ProcessDataResponse(cmdNode As IXMLDOMNode)
                         config.AddAirline getAttr(pNode, "code"), getAttr(pNode, "name")
                     Next
                     
-                    SetComboChoices frmMain.cboAirline, config.AirlineNames, info.Airline.Name, "-"
+                    SetComboChoices frmMain.cboAirline, config.AirlineNames, info.Airline.name, "-"
                     If config.ShowDebug Then ShowMessage "Updated Airline List", DEBUGTEXTCOLOR
                     config.SaveAirlines
                 End If

@@ -86,7 +86,7 @@ Public Sub FPlan_Open()
                     depData = Split(UCase(depInfo), ",")
                     
                     'Parse different data
-                    If ((routeType = 3) Or (routeType = 0)) Then
+                    If (routeType <> 1) Then
                         tmpRoute = tmpRoute + " " + Trim(depData(3))
                         If (x < 25) Then
                             lats(x) = ConvertLatLon(depData(5))
@@ -336,10 +336,6 @@ Public Sub FData_Open()
         MsgBox "Flight " & FlightID & " is not complete, and cannot be loaded.", vbExclamation Or _
             vbOKOnly, "Flight Not Completed"
         Exit Sub
-    ElseIf oldInfo.TestFlight Then
-        MsgBox "Flight " & FlightID & " was a Test Flight, and cannot be loaded.", vbExclamation Or _
-            vbOKOnly, "Test Flight"
-        Exit Sub
     End If
     
     'Load the position cache
@@ -357,8 +353,7 @@ Public Sub FData_Open()
     config.UpdateFlightInfo
     With frmMain
         .LockFlightInfo False
-        .chkCheckRide.Enabled = Not info.TestFlight
-        .chkTrainFlight.Enabled = Not info.CheckRide
+        .chkCheckRide.Enabled = True
         .tmrPosUpdates.Enabled = info.InFlight
         .tmrFlightTime.Enabled = info.InFlight
         .tmrStartCheck.Enabled = False
