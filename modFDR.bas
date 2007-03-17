@@ -272,7 +272,7 @@ If (fRate > 0) Then data.FrameRate = CInt(32768# / fRate)
 'Calculate speeds
 data.Airspeed = CInt(ASpeed / 128#)
 data.GroundSpeed = CInt(GSpeed * 3600# / 65536# / 1852#)
-61 data.VerticalSpeed = CInt(CDbl(VSpeed * 60# * 3.28084) / 256)
+61 data.VerticalSpeed = CLng(CDbl(VSpeed * 60# * 3.28084) / 256)
 data.Mach = CDbl(Mach / 20480#)
 If (isOnGround = 1) Then
     Dim tmpTSpeed As Long
@@ -500,7 +500,7 @@ Public Function PhaseChanged(cPos As PositionData) As Boolean
                 Dim AirborneDuration As Long
                 
                 'Check for bounces
-                AirborneDuration = DateDiff("s", info.TakeoffTime.LocalTime, Now)
+                AirborneDuration = DateDiff("s", info.TakeoffTime.LocalTime, now)
                 If (AirborneDuration < 5) And Not cPos.Crashed Then
                     If config.ShowDebug Then ShowMessage "Takeoff Bounce detected after " & CStr(AirborneDuration) & _
                         "s", DEBUGTEXTCOLOR

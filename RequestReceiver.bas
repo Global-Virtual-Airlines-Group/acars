@@ -282,6 +282,8 @@ Private Sub ProcessChatText(cmdNode As IXMLDOMNode)
     Dim msgText As String
     Dim p As Pilot
     Dim IsSterile As Boolean
+    Dim IsSnoop As Boolean
+    Dim IsAutoResponse As Boolean
     
     'Check if we are in sterile cockpit mode
     IsSterile = False
@@ -293,8 +295,22 @@ Private Sub ProcessChatText(cmdNode As IXMLDOMNode)
     msgTo = getChild(cmdNode, "to", "")
     msgText = getChild(cmdNode, "text", "")
     msgFrom = getChild(cmdNode, "from", "SYSTEM")
-    If (msgFrom <> "SYSTEM") Then Set p = users.GetPilot(msgFrom)
-    If (Not (p Is Nothing) And config.ShowPilotNames) Then msgFrom = p.name
+    IsAutoResponse = (Len(msgText) > 5) And (UCase(Left(msgText, 5)) = "AUTO:")
+    If config.ShowPilotNames Then
+        If (msgFrom <> "SYSTEM") Then Set p = users.GetPilot(msgFrom)
+        If (p Is Nothing) Then
+            msgFrom = getChild(cmdNode, "fromName", msgFrom)
+        Else
+            msgFrom = p.name
+        End If
+    End If
+    
+    'Check that the message is really for us
+    IsSnoop = False
+    If ((msgTo <> "") And (msgTo <> frmMain.txtPilotID.Text)) Then
+        IsSnoop = (config.HasRole("HR") And Not config.Busy And Not IsSterile And (frmMain.chkStealth.value = 1))
+        If Not IsSnoop Then Exit Sub
+    End If
 
     'Check if there is a "To" element. If so, it's a private message.
     config.MsgReceived = True
@@ -305,18 +321,25 @@ Private Sub ProcessChatText(cmdNode As IXMLDOMNode)
             If config.ShowDebug Then ShowMessage "Ignoring chat message - Sterile Cockpit", DEBUGTEXTCOLOR
         Else
             ShowMessage "<" & msgFrom & "> " & msgText, PUBLICCHATCOLOR
-            GAUGE_SetChat False
             
             'Play a sound if the option is on
             If (config.PlaySound And (Not config.Busy) And (GetForegroundWindow <> frmMain.hWnd)) _
                 Then PlaySoundFile "notify_msg.wav"
         End If
+    ElseIf (IsSnoop And Not IsAutoResponse) Then
+        If config.ShowPilotNames Then
+            Set p = users.GetPilot(msgTo)
+            If Not (p Is Nothing) Then msgTo = p.name
+        End If
+        
+        'Display the message
+        ShowMessage "<" & msgFrom & "-" & msgTo & "> " & msgText, PRIVATECHATCOLOR
     Else
         ShowMessage "<" & msgFrom & ":PRIVATE> " & msgText, PRIVATECHATCOLOR
         GAUGE_SetChat True
         
         'Send a response if we are busy
-        If Not (p Is Nothing) And (Left(msgText, 5) <> "AUTO:") Then
+        If Not (p Is Nothing) And (Not IsAutoResponse) Then
             If config.Busy Then
                 If (config.BusyMessage <> "") Then
                     SendChat "AUTO: " & config.BusyMessage, msgFrom

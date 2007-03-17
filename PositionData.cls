@@ -26,7 +26,7 @@ Public Longitude As Double
 Public Mach As Double
 Public Airspeed As Integer
 Public GroundSpeed As Integer
-Public VerticalSpeed As Integer
+Public VerticalSpeed As Long
 Public TouchdownSpeed As Integer
 Public Pitch As Double
 Public Bank As Double
