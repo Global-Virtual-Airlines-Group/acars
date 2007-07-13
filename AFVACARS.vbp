@@ -50,7 +50,6 @@ Class=Failures; Failures.cls
 Class=AircraftFuel; AircraftFuel.cls
 Module=FuelTanks; FuelTanks.bas
 Form=frmACARSMap.frm
-Class=Base64; Base64.cls
 ResFile32="afv_imgs.res"
 IconForm="frmSplash"
 Startup="Sub Main"
