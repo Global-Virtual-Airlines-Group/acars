@@ -1,4 +1,4 @@
-frmMain = 40, 235, 921, 789, , 8, 96, 727, 824, C
+frmMain = 40, 235, 921, 789, C, 8, 96, 727, 824, C
 modMain = 11, 85, 896, 802, C
 FSUIPC = 23, -1, 871, 808, C
 modRegistry = 40, 40, 906, 665, C
@@ -25,7 +25,7 @@ Airport = 88, 116, 761, 741, C
 DataPersistence = 19, 167, 863, 792, C
 XMLTools = 133, 566, 912, 1191, C
 SavedFlight = 22, 29, 695, 654, C
-frmSplash = 121, 78, 784, 687, C, 66, 87, 729, 696, C
+frmSplash = 121, 78, 1009, 723, C, 66, 87, 729, 696, C
 SHA256 = 98, -18, 890, 607, C
 FlightReport = 132, 174, 805, 799, C
 frmDraftPIREP = 175, -21, 848, 604, C, 44, 58, 753, 635, C
