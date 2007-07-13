@@ -106,7 +106,7 @@ Public Function RequestScheduleValidation(ad As Airport, aa As Airport) As Long
     RequestScheduleValidation = ReqStack.RequestID
     
     If config.ShowDebug Then ShowMessage "Requested schedule validation from " & _
-        ad.name & " (" & ad.ICAO & ") to " & aa.name & " (" & aa.ICAO & ")", DEBUGTEXTCOLOR
+        ad.Name & " (" & ad.ICAO & ") to " & aa.Name & " (" & aa.ICAO & ")", DEBUGTEXTCOLOR
 End Function
 
 Public Sub RequestPilotInfo(PilotID As String)
@@ -249,7 +249,7 @@ Public Sub SendChat(msgText As String, Optional msgTo As String)
     
         AddXMLField cmd, "to", p.ID
         If config.ShowPilotNames Then
-            msgFrom = msgFrom + "->" + p.name
+            msgFrom = msgFrom + "->" + p.Name
         Else
             msgFrom = msgFrom + "->" + p.ID
         End If
@@ -266,11 +266,15 @@ End Sub
 Public Function SendCredentials(userID As String, pwd As String) As Long
     Dim cmd As IXMLDOMElement
     Dim isStealth As Boolean
+    Dim isID As Boolean
     Dim now As New UTCDate
     
     'Log stealth mode
     isStealth = (frmMain.chkStealth.value = 1) And config.HasRole("HR")
     If isStealth And config.ShowDebug Then ShowMessage "Hidden/Stealth Connection", DEBUGTEXTCOLOR
+    
+    'Check if we're sending a database ID
+    isID = IsNumeric(userID)
     
     'Build the request
     Set cmd = buildCMD("auth")
@@ -280,6 +284,7 @@ Public Function SendCredentials(userID As String, pwd As String) As Long
     AddXMLField cmd, "password", pwd, True
     AddXMLField cmd, "build", CStr(App.Revision), False
     AddXMLField cmd, "stealth", CStr(isStealth), False
+    AddXMLField cmd, "isID", CStr(isID), False
     AddXMLField cmd, "version", "v" & CStr(App.Major) & "." & CStr(App.Minor), False
     AddXMLField cmd, "localUTC", I18nOutputDateTime(now), True
     ReqStack.Queue cmd
