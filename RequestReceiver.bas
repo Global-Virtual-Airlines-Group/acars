@@ -139,6 +139,7 @@ Private Sub ProcessACK(cmdNode As IXMLDOMNode)
         Dim newBuild As Integer
         Dim RoleNames As Variant
         Dim rName As Variant
+        Dim userID As String
     
         'Enable stuff and update status
         frmMain.sbMain.Panels(1).Text = "Status: Logged in to ACARS server"
@@ -183,6 +184,10 @@ Private Sub ProcessACK(cmdNode As IXMLDOMNode)
             frmMain.chkStealth.visible = False
             frmMain.chkStealth.Enabled = False
         End If
+        
+        'Check the user ID
+        userID = getChild(cmdNode, "userID", "")
+        If ((userID <> "") And (userID <> frmMain.txtPilotID.Text)) Then frmMain.txtPilotID.Text = userID
         
         'Get unrestricted flag
         config.NoMessages = CBool(getChild(cmdNode, "noMsgs", "false"))
@@ -301,7 +306,7 @@ Private Sub ProcessChatText(cmdNode As IXMLDOMNode)
         If (p Is Nothing) Then
             msgFrom = getChild(cmdNode, "fromName", msgFrom)
         Else
-            msgFrom = p.name
+            msgFrom = p.Name
         End If
     End If
     
@@ -329,7 +334,7 @@ Private Sub ProcessChatText(cmdNode As IXMLDOMNode)
     ElseIf (IsSnoop And Not IsAutoResponse) Then
         If config.ShowPilotNames Then
             Set p = users.GetPilot(msgTo)
-            If Not (p Is Nothing) Then msgTo = p.name
+            If Not (p Is Nothing) Then msgTo = p.Name
         End If
         
         'Display the message
@@ -391,7 +396,7 @@ Private Sub ProcessDataResponse(cmdNode As IXMLDOMNode)
     For Each rspNode In rspNodes
         Select Case LCase(rspNode.Text)
             Case "pilotlist"
-                Dim name As String
+                Dim Name As String
                 OldDispatch = users.DispatchOnline
                 
                 If config.ShowDebug Then ShowMessage "Updating Pilot List", DEBUGTEXTCOLOR
@@ -421,7 +426,7 @@ Private Sub ProcessDataResponse(cmdNode As IXMLDOMNode)
                     If (p.ID <> "") Then
                         users.AddPilot p
                         If (UCase(p.ID) = UCase(frmMain.txtPilotID.Text)) Then
-                            frmMain.txtPilotName.Text = p.name
+                            frmMain.txtPilotName.Text = p.Name
                             frmMain.txtPilotName.visible = True
                             frmMain.lblName.visible = True
                         End If
@@ -471,7 +476,7 @@ Private Sub ProcessDataResponse(cmdNode As IXMLDOMNode)
                     If (p.ID <> "") Then
                         Set oldPilot = users.GetPilot(p.ID)
                         users.AddPilot p
-                        If (oldPilot Is Nothing) Then ShowMessage p.name + " (" + p.ID + _
+                        If (oldPilot Is Nothing) Then ShowMessage p.Name + " (" + p.ID + _
                             ") logged into the ACARS server.", SYSMSGCOLOR
                     End If
                 Next
@@ -501,7 +506,7 @@ Private Sub ProcessDataResponse(cmdNode As IXMLDOMNode)
                     p.LastName = getChild(pNode, "lastname", "")
 
                     users.DeletePilot p.ID
-                    ShowMessage p.name + " (" + p.ID + ") logged out from the ACARS server.", SYSMSGCOLOR
+                    ShowMessage p.Name + " (" + p.ID + ") logged out from the ACARS server.", SYSMSGCOLOR
                 Next
                 
                 'Update the Pilot List
@@ -526,7 +531,7 @@ Private Sub ProcessDataResponse(cmdNode As IXMLDOMNode)
                     ctr.ID = getAttr(pNode, "code", "?")
                     ctr.NetworkID = getAttr(pNode, "networkID", "000000")
                     ctr.Frequency = getAttr(pNode, "freq", "199.98")
-                    ctr.name = getAttr(pNode, "name", "???")
+                    ctr.Name = getAttr(pNode, "name", "???")
                     ctr.Rating = getAttr(pNode, "rating", "Observer")
                     ctr.FacilityType = getAttr(pNode, "type", "Center")
                     
@@ -601,7 +606,7 @@ Private Sub ProcessDataResponse(cmdNode As IXMLDOMNode)
                         Set a = New Airport
                         a.ICAO = getAttr(pNode, "icao")
                         a.IATA = getAttr(pNode, "iata")
-                        a.name = Replace(getAttr(pNode, "name", a.ICAO), ",", "")
+                        a.Name = Replace(getAttr(pNode, "name", a.ICAO), ",", "")
                         a.Latitude = CDbl(Replace(getAttr(pNode, "lat", "0"), ".", config.DecimalSeparator))
                         a.Longitude = CDbl(Replace(getAttr(pNode, "lng", "0"), ".", config.DecimalSeparator))
                         config.AddAirport a
@@ -622,7 +627,7 @@ Private Sub ProcessDataResponse(cmdNode As IXMLDOMNode)
                         config.AddAirline getAttr(pNode, "code"), getAttr(pNode, "name")
                     Next
                     
-                    SetComboChoices frmMain.cboAirline, config.AirlineNames, info.Airline.name, "-"
+                    SetComboChoices frmMain.cboAirline, config.AirlineNames, info.Airline.Name, "-"
                     If config.ShowDebug Then ShowMessage "Updated Airline List", DEBUGTEXTCOLOR
                     config.SaveAirlines
                 End If
