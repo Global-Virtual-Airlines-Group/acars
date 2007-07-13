@@ -105,6 +105,7 @@ Public Const SIM_CFS1 = 4
 Public Const SIM_FLY = 5
 Public Const SIM_FS2K2 = 6
 Public Const SIM_FS2K4 = 7
+Public Const SIM_FSX = 8
 
 ' Error numbers
 Public Const FSUIPC_ERR_OK = 0
@@ -144,8 +145,6 @@ Public m_atom As Long       ' global atom containing name of file-mapping object
 Public m_hMap&              ' handle of file-mapping object
 Public m_pView&             ' pointer to view of file-mapping object
 Public m_pNext&
-
-
 
 Public Const LIB_VERSION = 1004              ' 1.004
 Public Const MAX_SIZE = &H7F00&              ' Largest data (kept below 32k to avoid
@@ -581,3 +580,4 @@ Function FSUIPC_Error(ByVal errCode As Integer) As String
     
     FSUIPC_Error = ErrorText(errCode)
 End Function
+
