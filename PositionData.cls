@@ -40,6 +40,7 @@ Public EnginesStarted As Boolean
 Public WindSpeed As Integer
 Public WindHeading As Integer
 Public GForce As Double
+Public TouchdownGForce As Double
 Public AngleOfAttack As Double
 
 'Flight state flags

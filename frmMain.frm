@@ -197,19 +197,19 @@ Begin VB.Form frmMain
       TabCaption(1)   =   "Connected Pilots"
       TabPicture(1)   =   "frmMain.frx":0028
       Tab(1).ControlEnabled=   0   'False
-      Tab(1).Control(0)=   "lstPilots"
-      Tab(1).Control(1)=   "cmdBusy"
+      Tab(1).Control(0)=   "infoFrame"
+      Tab(1).Control(1)=   "cmdUpdatePilotList"
       Tab(1).Control(1).Enabled=   0   'False
-      Tab(1).Control(2)=   "cmdUpdatePilotList"
+      Tab(1).Control(2)=   "cmdBusy"
       Tab(1).Control(2).Enabled=   0   'False
-      Tab(1).Control(3)=   "infoFrame"
+      Tab(1).Control(3)=   "lstPilots"
       Tab(1).ControlCount=   4
       TabCaption(2)   =   "Air Traffic Control"
       TabPicture(2)   =   "frmMain.frx":0044
       Tab(2).ControlEnabled=   0   'False
-      Tab(2).Control(0)=   "radioFrame"
+      Tab(2).Control(0)=   "lstATC"
       Tab(2).Control(1)=   "ctrFrame"
-      Tab(2).Control(2)=   "lstATC"
+      Tab(2).Control(2)=   "radioFrame"
       Tab(2).ControlCount=   3
       TabCaption(3)   =   "XML Message Data"
       TabPicture(3)   =   "frmMain.frx":0060
@@ -244,6 +244,7 @@ Begin VB.Form frmMain
          _ExtentY        =   5530
          _Version        =   393217
          BorderStyle     =   0
+         Enabled         =   -1  'True
          ReadOnly        =   -1  'True
          ScrollBars      =   2
          TextRTF         =   $"frmMain.frx":007C
@@ -789,6 +790,7 @@ Begin VB.Form frmMain
          _ExtentY        =   4948
          _Version        =   393217
          BorderStyle     =   0
+         Enabled         =   -1  'True
          ReadOnly        =   -1  'True
          ScrollBars      =   2
          OLEDragMode     =   0
@@ -1481,7 +1483,7 @@ Private Sub FilePIREP()
     End If
 
     'Send the PIREP
-    msgID = SendPIREP(info)
+    msgID = SendPIREP(info, acInfo)
     ShowMessage "Sending Flight Report " + Hex(msgID), ACARSTEXTCOLOR
     frmMain.PositionProgress.value = frmMain.PositionProgress.Max
     ReqStack.Send
