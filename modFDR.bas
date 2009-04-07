@@ -92,6 +92,7 @@ Dim VSpeed As Long
 Dim TSpeed As Long
 Dim Mach As Long
 Dim Gs As Integer
+Dim TGs As Integer
 Dim AofA As Double
 
 Dim Bank As Long
@@ -132,6 +133,7 @@ Call FSUIPC_Read(&H574, 4, VarPtr(altMSL), lngResult)
 Call FSUIPC_Read(&H2A0, 2, VarPtr(magVar), lngResult)
 Call FSUIPC_Read(&H580, 4, VarPtr(hdg), lngResult)
 Call FSUIPC_Read(&H11BA, 2, VarPtr(Gs), lngResult)
+Call FSUIPC_Read(&H11B8, 2, VarPtr(TGs), lngResult)
 'Call FSUIPC_Read(&H11BE, 2, VarPtr(AofA), lngResult)
 Call FSUIPC_Read(&H2ED0, 8, VarPtr(AofA), lngResult)
 
@@ -277,7 +279,10 @@ data.Mach = CDbl(Mach / 20480#)
 If (isOnGround = 1) Then
     Dim tmpTSpeed As Long
 62  tmpTSpeed = CLng(TSpeed * 60# * 3.28084 / 256#)
-    If (Abs(tmpTSpeed) < 32000) Then data.TouchdownSpeed = tmpTSpeed
+    If (Abs(tmpTSpeed) < 32000) Then
+        data.TouchdownSpeed = tmpTSpeed
+        data.TouchdownGForce = TGs / 625#
+    End If
 End If
 
 'Calculate G-force/Angle of Attack
@@ -510,6 +515,7 @@ Public Function PhaseChanged(cPos As PositionData) As Boolean
                 info.LandingTime.SetNow
                 info.LandingSpeed = cPos.Airspeed
                 info.LandingVSpeed = cPos.TouchdownSpeed
+                info.LandingG = cPos.TouchdownGForce
                 info.LandingFuel = cPos.Fuel
                 info.LandingWeight = cPos.weight
                 info.LandingN1 = cPos.AverageN1
@@ -764,6 +770,7 @@ Public Function GetAircraftInfo() As AircraftInfo
     Dim EngineType As Integer
     Dim EngineCount As Integer
     Dim ZeroFuelWeight As Long
+    Dim MaxGrossWeight As Long
 
 10  Call FSUIPC_Read(&H3E00, 256, VarPtr(FSBytes(0)), dwResult)
     Call FSUIPC_Read(&H3C00, 256, VarPtr(AIRBytes(0)), dwResult)
@@ -771,6 +778,7 @@ Public Function GetAircraftInfo() As AircraftInfo
     Call FSUIPC_Read(&H609, 1, VarPtr(EngineType), dwResult)
     Call FSUIPC_Read(&HAEC, 2, VarPtr(EngineCount), dwResult)
     Call FSUIPC_Read(&H3BFC, 4, VarPtr(ZeroFuelWeight), dwResult)
+    Call FSUIPC_Read(&H1334, 4, VarPtr(MaxGrossWeight), dwResult)
     
     'Determine what tanks are on this aircraft
     Dim TankCapacity() As Long
@@ -803,6 +811,7 @@ Public Function GetAircraftInfo() As AircraftInfo
     airInfo.EngineType = EngineType
     airInfo.EngineCount = EngineCount
     airInfo.ZeroFuelWeight = ZeroFuelWeight \ 256
+    airInfo.MaxGrossWeight = MaxGrossWeight \ 256
     
     'Check the tanks
 50   For x = 0 To UBound(tankOffsets)

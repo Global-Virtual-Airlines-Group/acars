@@ -63,6 +63,7 @@ Public TakeoffN1 As Double
 Public LandingTime As New UTCDate
 Public LandingSpeed As Integer
 Public LandingVSpeed As Integer
+Public LandingG As Double
 Public LandingFuel As Long
 Public LandingWeight As Long
 Public LandingN1 As Double

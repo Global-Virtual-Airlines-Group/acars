@@ -106,7 +106,7 @@ Public Function RequestScheduleValidation(ad As Airport, aa As Airport) As Long
     RequestScheduleValidation = ReqStack.RequestID
     
     If config.ShowDebug Then ShowMessage "Requested schedule validation from " & _
-        ad.Name & " (" & ad.ICAO & ") to " & aa.Name & " (" & aa.ICAO & ")", DEBUGTEXTCOLOR
+        ad.name & " (" & ad.ICAO & ") to " & aa.name & " (" & aa.ICAO & ")", DEBUGTEXTCOLOR
 End Function
 
 Public Sub RequestPilotInfo(PilotID As String)
@@ -249,7 +249,7 @@ Public Sub SendChat(msgText As String, Optional msgTo As String)
     
         AddXMLField cmd, "to", p.ID
         If config.ShowPilotNames Then
-            msgFrom = msgFrom + "->" + p.Name
+            msgFrom = msgFrom + "->" + p.name
         Else
             msgFrom = msgFrom + "->" + p.ID
         End If
@@ -410,7 +410,7 @@ Public Function SendPosition(ByVal cPos As PositionData, ByVal IsLogged As Boole
     End If
 End Function
 
-Public Function SendPIREP(info As FlightData) As Long
+Public Function SendPIREP(info As FlightData, aInfo As AircraftInfo) As Long
     Dim cmd As IXMLDOMElement
 
     'Build the request
@@ -441,6 +441,7 @@ Public Function SendPIREP(info As FlightData) As Long
     AddXMLField cmd, "landingN1", FormatNumber(info.LandingN1, "##0.0")
     AddXMLField cmd, "landingSpeed", CStr(info.LandingSpeed), False
     AddXMLField cmd, "landingVSpeed", CStr(info.LandingVSpeed), False
+    AddXMLField cmd, "landingG", FormatNumber(info.LandingG, "#0.0000")
     AddXMLField cmd, "gateTime", I18nOutputDateTime(info.GateTime)
     AddXMLField cmd, "gateFuel", CStr(info.GateFuel), False
     AddXMLField cmd, "gateWeight", CStr(info.GateWeight), False
@@ -448,6 +449,10 @@ Public Function SendPIREP(info As FlightData) As Long
     AddXMLField cmd, "time1X", CStr(info.TimeAt1X), False
     AddXMLField cmd, "time2X", CStr(info.TimeAt2X), False
     AddXMLField cmd, "time4X", CStr(info.TimeAt4X), False
+    
+    'Add aircraft info fields
+    AddXMLField cmd, "fde", aInfo.AIRFile, True
+    AddXMLField cmd, "code", aInfo.code, True
 
     'Send the request
     ReqStack.Queue cmd
